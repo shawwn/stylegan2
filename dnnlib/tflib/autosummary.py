@@ -65,7 +65,7 @@ def _create_var(name: str, value_expr: TfExpression) -> TfExpression:
     v = tf.cond(tf.is_finite(v[1]), lambda: tf.stack(v), lambda: tf.zeros(3, dtype=_dtype))
 
     with tfutil.absolute_name_scope("Autosummary/" + name_id), tf.control_dependencies(None):
-        var = tf.Variable(tf.zeros(3, dtype=_dtype), trainable=False)  # [sum(1), sum(x), sum(x**2)]
+        var = tf.Variable(tf.zeros(3, dtype=_dtype), trainable=False, use_resource=True)  # [sum(1), sum(x), sum(x**2)]
     update_op = tf.cond(tf.is_variable_initialized(var), lambda: tf.assign_add(var, v), lambda: tf.assign(var, v))
 
     if name in _vars:
@@ -92,6 +92,7 @@ def autosummary(name: str, value: TfExpressionEx, passthru: TfExpressionEx = Non
     with tf.control_dependencies([autosummary('l2loss', loss)]):
         n = tf.identity(n)
     """
+    return value
     tfutil.assert_tf_initialized()
     name_id = name.replace("/", "_")
 

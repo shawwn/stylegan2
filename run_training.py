@@ -36,7 +36,7 @@ _valid_configs = [
 #----------------------------------------------------------------------------
 
 def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, mirror_augment, metrics):
-    train     = EasyDict(run_func_name='training.training_loop.training_loop') # Options for training loop.
+    train     = EasyDict(run_func_name='training.training_loop_tpu.training_loop_tpu') # Options for training loop.
     G         = EasyDict(func_name='training.networks_stylegan2.G_main')       # Options for generator network.
     D         = EasyDict(func_name='training.networks_stylegan2.D_stylegan2')  # Options for discriminator network.
     G_opt     = EasyDict(beta1=0.0, beta2=0.99, epsilon=1e-8)                  # Options for generator optimizer.
@@ -171,7 +171,8 @@ def main():
     parser.add_argument('--mirror-augment', help='Mirror augment (default: %(default)s)', default=False, metavar='BOOL', type=_str_to_bool)
     parser.add_argument('--metrics', help='Comma-separated list of metrics or "none" (default: %(default)s)', default='fid50k', type=_parse_comma_sep)
 
-    args = parser.parse_args()
+    argv = sys.argv[1:sys.argv.index('--') if '--' in sys.argv else None]
+    args = parser.parse_args(argv)
 
     if not gfile.IsDirectory(args.data_dir):
         print ('Error: dataset root directory does not exist.')

@@ -96,7 +96,7 @@ class Network:
 
         # Init TensorFlow graph.
         self._init_graph()
-        self.reset_own_vars()
+        #self.reset_own_vars()
 
     def _init_fields(self) -> None:
         self.name = None

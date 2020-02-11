@@ -21,7 +21,7 @@ from tensorflow.python.client import device_lib # pylint: disable=no-name-in-mod
 
 cuda_cache_path = os.path.join(os.path.dirname(__file__), '_cudacache')
 cuda_cache_version_tag = 'v1'
-do_not_hash_included_headers = False # Speed up compilation by assuming that headers included by the CUDA code never change. Unsafe!
+do_not_hash_included_headers = True # Speed up compilation by assuming that headers included by the CUDA code never change. Unsafe!
 verbose = True # Print status messages to stdout.
 
 compiler_bindir_search_path = [
@@ -164,6 +164,8 @@ def get_plugin(cuda_file):
     except:
         if verbose:
             print('Failed!', flush=True)
-        raise
+        import pdb
+        pdb.set_trace()
+        #raise
 
 #----------------------------------------------------------------------------

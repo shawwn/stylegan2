@@ -621,6 +621,8 @@ def utc():
     return calendar.timegm(d.utctimetuple())
 
 def heartbeat():
+  if 'TFLEX_HEARTBEAT' not in os.environ:
+    return
   pongfile=os.environ['PONG'] if 'PONG' in os.environ else 'pong.txt'
   with open(pongfile, "a+") as f:
     nonce = os.urandom(8).hex()
@@ -720,6 +722,7 @@ def device(name=''):
   if has_override_device():
     return nullcontext()
   if has_override_cores():
+    return nullcontext()
     if name is None:
       return tf.device(name)
     if name.startswith('/gpu:'):
