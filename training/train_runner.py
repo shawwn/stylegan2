@@ -24,12 +24,14 @@ import time
 
 from absl import flags
 import tensorflow as tf
+import tflex
 
 from tensorflow.contrib import tpu
 from tensorflow.contrib.tpu.python.tpu import tpu_function
 from tensorflow.core.protobuf import rewriter_config_pb2
 from tensorflow.python.data.util import nest as data_nest
 from tensorflow.python.framework import graph_io
+from pprint import pprint
 
 FLAGS = flags.FLAGS
 
@@ -106,7 +108,7 @@ class TrainRunner(object):
     cluster_spec = self.cluster_resolver.cluster_spec()
     if cluster_spec:
       self.config.cluster_def.CopyFrom(cluster_spec.as_cluster_def())
-    self.init_sess = tf.Session(self.cluster_resolver.get_master(), config=self.config, graph=self.init_graph)
+    self.init_sess = tflex.Session(self.cluster_resolver.get_master(), config=self.config, graph=self.init_graph)
     self.init_sess.run(tpu_init)
 
   def device_for_host(self, task=0, cpu=0):
@@ -183,7 +185,7 @@ class TrainRunner(object):
         self.build_enqueue_ops(input_fn, params, i)
         i += 1
       # Build infeed sesssion
-      self.input_sess = tf.Session(
+      self.input_sess = tflex.Session(
           self.cluster_resolver.get_master(),
           graph=self.input_graph,
           config=self.config)
@@ -226,15 +228,34 @@ class TrainRunner(object):
         outputs_from_all_shards=False,
     )
     initializer = tf.global_variables_initializer()
-    self.saver = tf.train.Saver()
     graph_io.write_graph(tf.Graph().as_graph_def(add_shapes=True),
                          FLAGS.model_dir, "graph.pbtxt")
 
     # Build tpu train model session and initialize graph
-    self.sess = tf.Session(
+    self.sess = tflex.Session(
         self.cluster_resolver.get_master(),
         config=self.config)
     self.sess.run(initializer)
+
+    self.var_list = [v for v in tf.global_variables() if 'Dataset/' not in v.name]
+    pprint(self.var_list)
+    self.saver = tf.train.Saver(
+      var_list=self.var_list,
+    )
+    if FLAGS.restore_dir is not None:
+      ckpt = tf.train.latest_checkpoint(FLAGS.restore_dir)
+      assert(ckpt is not None)
+    else:
+      ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
+    #ckpt = 'gs://danbooru-euw4a/checkpoint/test3/model.ckpt-742400'
+    if ckpt is None:
+      self.cur_ex = 0
+      tf.logging.info("TrainRunner: Saving initial model...")
+      self.saver.save(self.sess, FLAGS.model_dir + "/model.ckpt-%d" % 0)
+    else:
+      self.cur_ex = int(ckpt.split('-')[-1])
+      tf.logging.info('TrainRunner: Restoring %s' % ckpt)
+      self.saver.restore(self.sess, ckpt)
 
     # Complete infeed graph generation and session.run calls
     self.infeed_thread = threading.Thread(target=infeed_thread_fn)
@@ -249,22 +270,28 @@ class TrainRunner(object):
     """
 
     def checkpoint_thread_fn(saver, sess):
-      saver.save(sess, FLAGS.model_dir + "/model.ckpt-%d" % (cur_step))
+      saver.save(sess, FLAGS.model_dir + "/model.ckpt-%d" % (self.cur_ex))
 
     cur_step = 0
     thread_id = 0
     checkpoint_threads = []
     tf.logging.info("TrainRunner: step %d", cur_step)
+    begin = time.time()
     for i in range(num_threads):
       checkpoint_threads.append(None)
     while cur_step < self.train_steps:
       start = time.time()
       tf.logging.info("TrainRunner: start next %d steps", self.iterations)
       cur_step += self.iterations
+      self.cur_ex += self.iterations * FLAGS.train_batch_size
       loss = self.sess.run([self.loss])
-      if cur_step % 100 == 0 and cur_step > 0:
+      if cur_step % 10 == 0 and cur_step > 0:
         if checkpoint_threads[thread_id] is not None:
+          tf.logging.info("TrainRunner: waiting for checkpoint thread....")
           checkpoint_threads[thread_id].join()
+        from pprint import pprint
+        #pprint(self.var_list)
+        #tf.logging.info("TrainRunner: saving checkpoint....")
         checkpoint_threads[thread_id] = threading.Thread(
             target=checkpoint_thread_fn, args=(self.saver, self.sess))
         checkpoint_threads[thread_id].start()
@@ -273,8 +300,8 @@ class TrainRunner(object):
           thread_id = 0
       end = time.time()
       tf.logging.info(
-          "TrainRunner: step {} loss {} step time {} sec {} examples/sec"
-          .format(cur_step, loss, end - start,
+          "TrainRunner: step {} kex {:.3f} loss {} step time {:.2f}s total {:.2f}s {:.2f} examples/sec"
+          .format(cur_step, self.cur_ex / 1000.0, loss, end - start, end - begin,
                   self.iterations * FLAGS.train_batch_size / (end - start)))
 
     self.infeed_thread.join()

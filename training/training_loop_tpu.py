@@ -90,6 +90,10 @@ flags.DEFINE_string(
     help=('The directory where the model and training/evaluation summaries are'
           ' stored.'))
 
+flags.DEFINE_string(
+  'restore_dir', default=None,
+  help=('The directory where the model is loaded from.'))
+
 flags.DEFINE_integer(
     'resnet_depth', default=50,
     help=('Depth of ResNet model to use. Must be one of {18, 34, 50, 101, 152,'
@@ -606,13 +610,15 @@ def resnet_model_fn(features, labels, mode, params):
     Gs_update_op = Gs.setup_as_moving_average_of(G, beta=Gs_beta)
 
   ops = []
-  ops.append(G_train_op)
+  for i in range(4):
+    ops.append(G_train_op)
   if G_reg_op is not None:
     ops.append(G_reg_op)
-  ops.append(D_train_op)
+  ops.append(Gs_update_op)
+  for i in range(4):
+    ops.append(D_train_op)
   if D_reg_op is not None:
     ops.append(D_reg_op)
-  ops.append(Gs_update_op)
   train_op = tf.group(*ops)
   #import pdb; pdb.set_trace()
 
@@ -837,7 +843,7 @@ def training_loop_tpu(
     training_set = dataset.load_dataset(data_dir=dnnlib.convert_path(data_dir), verbose=True, **dataset_args)
     #grid_size, grid_reals, grid_labels = misc.setup_snapshot_image_grid(training_set, **grid_args)
     #misc.save_image_grid(grid_reals, dnnlib.make_run_dir_path('reals.png'), drange=training_set.dynamic_range, grid_size=grid_size)
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
 
     assert FLAGS.precision == 'bfloat16' or FLAGS.precision == 'float32', (
         'Invalid value for --precision flag; must be bfloat16 or float32.')
@@ -866,7 +872,8 @@ def training_loop_tpu(
 
     #iterations_per_loop=157
     iterations_per_loop=1
-    train_steps=2983
+    train_steps=298300
+    #train_steps=112590
     trunner = train_runner.TrainRunner(iterations=iterations_per_loop, train_steps=train_steps)
     params = {'batch_size': FLAGS.train_batch_size,
               'G_args': G_args, 'D_args': D_args,
@@ -901,8 +908,9 @@ def training_loop_tpu(
 
     trunner.initialize(imagenet_train.input_fn, tpu_model_fn, params)
 
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     trunner.train()
+    return
 
     # Construct or load networks.
     with tflex.device('/gpu:0'):
