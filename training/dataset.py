@@ -97,7 +97,7 @@ class TFRecordDataset:
         # Build TF expressions.
         with tf.name_scope('Dataset'), tflex.device('/cpu:0'):
             self._tf_minibatch_in = tf.placeholder(tf.int64, name='minibatch_in', shape=[])
-            self._tf_labels_var = tflib.create_var_with_large_initial_value(self._np_labels, name='labels_var')
+            self._tf_labels_var = tflib.create_var_with_large_initial_value(self._np_labels, name='labels_var', use_resource=True)
             self._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(self._tf_labels_var)
             for tfr_file, tfr_shape, tfr_lod in zip(tfr_files, tfr_shapes, tfr_lods):
                 if tfr_lod < 0:

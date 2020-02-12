@@ -376,6 +376,10 @@ def training_schedule(
     s.tick_kimg = tick_kimg_dict.get(s.resolution, tick_kimg_base)
     return s
 
+# The input tensor is in the range of [0, 255], we need to scale them to the
+# range of [0, 1]
+MEAN_RGB = [0.485 * 255, 0.456 * 255, 0.406 * 255]
+STDDEV_RGB = [0.229 * 255, 0.224 * 255, 0.225 * 255]
 
 def resnet_model_fn(features, labels, mode, params):
   """The model_fn for ResNet to be used with TPUEstimator.
@@ -414,8 +418,8 @@ def resnet_model_fn(features, labels, mode, params):
       features = tf.transpose(features, [2, 0, 1, 3])  # HWNC to NHWC
 
   # Normalize the image to zero mean and unit variance.
-  #features -= tf.constant(MEAN_RGB, shape=[1, 1, 3], dtype=features.dtype)
-  #features /= tf.constant(STDDEV_RGB, shape=[1, 1, 3], dtype=features.dtype)
+  features -= tf.constant(MEAN_RGB, shape=[1, 1, 3], dtype=features.dtype)
+  features /= tf.constant(STDDEV_RGB, shape=[1, 1, 3], dtype=features.dtype)
 
   # This nested function allows us to avoid duplicating the logic which
   # builds the network, for different values of --precision.
