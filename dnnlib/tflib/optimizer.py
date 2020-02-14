@@ -150,6 +150,9 @@ class Optimizer:
             if device_name not in self._shared_optimizers:
                 optimizer_name = self.scope.replace("/", "_") + "_opt%d" % len(self._shared_optimizers)
                 self._shared_optimizers[device_name] = self.optimizer_class(name=optimizer_name, learning_rate=self.learning_rate, **self.optimizer_kwargs)
+                if 'TPU_REPLICATED_CORE' in device_name:
+                    print('Using cross-shard optimizer for %s' % device_name)
+                    self._shared_optimizers[device_name] = tf.contrib.tpu.CrossShardOptimizer(self._shared_optimizers[device_name])
             device.optimizer = self._shared_optimizers[device_name]
             if self.use_loss_scaling:
                 device.loss_scaling_var = tf.Variable(np.float32(self.loss_scaling_init), trainable=False, name="loss_scaling_var")
@@ -170,7 +173,7 @@ class Optimizer:
             trainable_vars = list(trainable_vars.values())  # allow passing in Network.trainables as vars
         assert isinstance(trainable_vars, list) and len(trainable_vars) >= 1
         assert all(tfutil.is_tf_expression(expr) for expr in trainable_vars + [loss])
-        assert all(var.device == device.name for var in trainable_vars)
+        #assert all(var.device == device.name for var in trainable_vars)
 
         # Validate shapes.
         if self._gradient_shapes is None:
@@ -302,9 +305,9 @@ class Optimizer:
         # Initialize variables.
         self.reset_optimizer_state()
         if self.use_loss_scaling:
-            tfutil.init_uninitialized_vars([device.loss_scaling_var for device in self._devices.values()])
+            tfutil.init_uninitialized_vars([device.loss_scaling_var for device in self._devs()])
         if self.minibatch_multiplier is not None:
-            tfutil.run([var.initializer for device in self._devices.values() for var in list(device.grad_acc_vars.values()) + [device.grad_acc_count]])
+            tfutil.run([var.initializer for device in self._devs() for var in list(device.grad_acc_vars.values()) + [device.grad_acc_count]])
 
         # Group everything into a single op.
         with tfutil.absolute_name_scope(self.scope):
@@ -313,7 +316,10 @@ class Optimizer:
     def reset_optimizer_state(self) -> None:
         """Reset internal state of the underlying optimizer."""
         tfutil.assert_tf_initialized()
-        tfutil.run([var.initializer for device in self._devices.values() for var in device.optimizer.variables()])
+        tfutil.run([var.initializer for device in self._devs() for var in device.optimizer.variables()])
+
+    def _devs(self):
+        return [x for x in self._devices.values() if 'TPU_REPLICATED_CORE' not in x.name]
 
     def get_loss_scaling_var(self, device: str) -> Union[tf.Variable, None]:
         """Get or create variable representing log2 of the current dynamic loss scaling factor."""

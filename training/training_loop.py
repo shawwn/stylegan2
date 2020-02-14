@@ -9,6 +9,7 @@
 import os
 import numpy as np
 import tensorflow as tf
+from tensorflow.contrib import tpu
 import tflex
 import time
 import dnnlib
@@ -229,8 +230,8 @@ def training_loop(
 
     # Build training graph for each GPU.
     data_fetch_ops = []
-    for gpu in range(num_gpus):
-        with tf.name_scope('GPU%d' % gpu), tflex.device('/gpu:%d' % gpu):
+    for gpu in range(1):
+        with tf.name_scope('DEV%d' % gpu), tflex.device('/gpu:%d' % gpu):
 
             # Create GPU-specific shadow copies of G and D.
             G_gpu = G if gpu == 0 else G.clone(G.name + '_shadow')
@@ -287,7 +288,23 @@ def training_loop(
                 peak_gpu_mem_op = tf.constant(0)
     else:
         peak_gpu_mem_op = None
-    tflib.init_uninitialized_vars()
+    #tflib.init_uninitialized_vars()
+
+    def get_step(ops, inputs=[], num_shards=None):
+        if num_shards is None
+            num_shards = num_gpus
+        def tpu_step():
+            with tflex.device('/tpu:0'):
+                with tf.control_dependencies(ops):
+                    return tf.identity(tf.constant(0.0))
+        return tpu.batch_parallel(tpu_step, inputs=inputs, num_shards=num_shards)
+
+    data_fetch_op = get_step([data_fetch_op])
+    G_train_op = get_step([G_train_op])
+    D_train_op = get_step([D_train_op])
+    G_reg_op = get_step([G_reg_op])
+    D_reg_op = get_step([D_reg_op])
+    Gs_update_op = get_step([Gs_update_op])
 
     print('Initializing logs...')
     summary_log = tf.summary.FileWriter(dnnlib.make_run_dir_path())
