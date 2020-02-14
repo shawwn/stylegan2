@@ -291,7 +291,7 @@ def training_loop(
     #tflib.init_uninitialized_vars()
 
     def get_step(ops, inputs=[], num_shards=None):
-        if num_shards is None
+        if num_shards is None:
             num_shards = num_gpus
         def tpu_step():
             with tflex.device('/tpu:0'):
