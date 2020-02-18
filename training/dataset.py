@@ -84,7 +84,7 @@ class TFRecordDataset:
 
         # Load labels.
         assert max_label_size == 'full' or max_label_size >= 0
-        self._np_labels = np.zeros([1<<30, 0], dtype=np.float32)
+        self._np_labels = np.zeros([1<<16, 0], dtype=np.float32)
         if self.label_file is not None and max_label_size != 0:
             self._np_labels = np.load(self.label_file)
             assert self._np_labels.ndim == 2
