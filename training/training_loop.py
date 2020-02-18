@@ -10,6 +10,7 @@ import os
 import numpy as np
 import tensorflow as tf
 import tflex
+import tqdm
 import time
 import dnnlib
 import dnnlib.tflib as tflib
@@ -229,12 +230,35 @@ def training_loop(
 
     # Build training graph for each GPU.
     data_fetch_ops = []
-    for gpu in range(num_gpus):
+    shards = {}
+    def get_shard(i):
+        with tflex.lock:
+            if i not in shards:
+                shards[i] = dnnlib.EasyDict()
+            return shards[i]
+    def make_generator(gpu):
+        me = get_shard(gpu)
         with tf.name_scope('GPU%d' % gpu), tflex.device('/gpu:%d' % gpu):
-
             # Create GPU-specific shadow copies of G and D.
             G_gpu = G if gpu == 0 else G.clone(G.name + '_shadow')
             D_gpu = D if gpu == 0 else D.clone(D.name + '_shadow')
+        with tflex.lock:
+            me.G = G_gpu
+            me.D = D_gpu
+    print('Making generators...')
+    tflex.parallelize_verbose("Generator", range(num_gpus), make_generator, synchronous=True)
+
+    def make_shard(gpu):
+        nonlocal data_fetch_ops
+        me = get_shard(gpu)
+        with tf.name_scope('GPU%d' % gpu), tflex.device('/gpu:%d' % gpu):
+            # Create GPU-specific shadow copies of G and D.
+            #G_gpu = G if gpu == 0 else G.clone(G.name + '_shadow')
+            #D_gpu = D if gpu == 0 else D.clone(D.name + '_shadow')
+            G_gpu = me.G
+            D_gpu = me.D
+
+            tflex.break_next_run = (gpu > 0)
 
             # Fetch training data via temporary variables.
             with tf.name_scope('DataFetch'):
@@ -245,8 +269,8 @@ def training_loop(
                 reals_write, labels_write = process_reals(reals_write, labels_write, lod_in, mirror_augment, training_set.dynamic_range, drange_net)
                 reals_write = tf.concat([reals_write, reals_var[minibatch_gpu_in:]], axis=0)
                 labels_write = tf.concat([labels_write, labels_var[minibatch_gpu_in:]], axis=0)
-                data_fetch_ops += [tf.assign(reals_var, reals_write)]
-                data_fetch_ops += [tf.assign(labels_var, labels_write)]
+                data_fetch_ops += [tf.group(tf.assign(reals_var, reals_write), name="fetch_reals")]
+                data_fetch_ops += [tf.group(tf.assign(labels_var, labels_write), name="fetch_labels")]
                 reals_read = reals_var[:minibatch_gpu_in]
                 labels_read = labels_var[:minibatch_gpu_in]
 
@@ -269,14 +293,18 @@ def training_loop(
                 if D_reg is not None: D_reg_opt.register_gradients(tf.reduce_mean(D_reg * D_reg_interval), D_gpu.trainables)
             G_opt.register_gradients(tf.reduce_mean(G_loss), G_gpu.trainables)
             D_opt.register_gradients(tf.reduce_mean(D_loss), D_gpu.trainables)
+    print('Making shards...')
+    tflex.parallelize_verbose("Shard", range(num_gpus), make_shard, synchronous=True)
 
     # Setup training ops.
     data_fetch_op = tf.group(*data_fetch_ops)
-    G_train_op = G_opt.apply_updates()
-    D_train_op = D_opt.apply_updates()
-    G_reg_op = G_reg_opt.apply_updates(allow_no_op=True)
-    D_reg_op = D_reg_opt.apply_updates(allow_no_op=True)
+    G_train_op, G_finalize = G_opt.apply_updates()
+    D_train_op, D_finalize = D_opt.apply_updates()
+    G_reg_op, G_reg_finalize = G_reg_opt.apply_updates(allow_no_op=True)
+    D_reg_op, D_reg_finalize = D_reg_opt.apply_updates(allow_no_op=True)
     Gs_update_op = Gs.setup_as_moving_average_of(G, beta=Gs_beta)
+
+    tflex.parallelize_verbose("initialize optimizers", [G_finalize, D_finalize, G_reg_finalize, D_reg_finalize], lambda f: f())
 
     # Finalize graph.
     if tflex.has_gpu():
@@ -305,6 +333,7 @@ def training_loop(
     tick_start_nimg = cur_nimg
     prev_lod = -1.0
     running_mb_counter = 0
+    need_warmup = True
     while cur_nimg < total_kimg * 1000:
         if tflex.state.noisy: print('cur_nimg', cur_nimg, total_kimg)
         if dnnlib.RunContext.get().should_stop(): break
@@ -320,6 +349,13 @@ def training_loop(
 
         # Run training ops.
         feed_dict = {lod_in: sched.lod, lrate_in: sched.G_lrate, minibatch_size_in: sched.minibatch_size, minibatch_gpu_in: sched.minibatch_gpu}
+        if need_warmup:
+            i = 0
+            all_ops = [[G_train_op, data_fetch_op], [G_reg_op], [D_train_op, Gs_update_op], [D_reg_op]]
+            for ops in all_ops:
+                tflex.parallelize_verbose("warmup %d / %d" % (i, len(all_ops)), ops, lambda op: tflib.run(op, feed_dict))
+                i += 1
+            need_warmup = False
         for _repeat in range(minibatch_repeats):
             if tflex.state.noisy: print('_repeat', _repeat)
             rounds = range(0, sched.minibatch_size, sched.minibatch_gpu * num_gpus)
@@ -331,11 +367,15 @@ def training_loop(
             # Fast path without gradient accumulation.
             if len(rounds) == 1:
                 if tflex.state.noisy: print('G_train_op', 'fast path')
-                tflib.run([G_train_op, data_fetch_op], feed_dict)
+                #tflib.run([G_train_op, data_fetch_op], feed_dict)
+                tflib.run(G_train_op, feed_dict)
+                tflib.run(data_fetch_op, feed_dict)
                 if run_G_reg:
                     tflib.run(G_reg_op, feed_dict)
                 if tflex.state.noisy: print('D_train_op', 'fast path')
-                tflib.run([D_train_op, Gs_update_op], feed_dict)
+                #tflib.run([D_train_op, Gs_update_op], feed_dict)
+                tflib.run(D_train_op, feed_dict)
+                tflib.run(Gs_update_op, feed_dict)
                 if run_D_reg:
                     tflib.run(D_reg_op, feed_dict)
 
@@ -410,10 +450,14 @@ def training_loop(
 
               # Save snapshots.
               if image_snapshot_ticks is not None and (cur_tick % image_snapshot_ticks == 0 or done):
-                  grid_fakes = Gs.run(grid_latents, grid_labels, is_validation=True, randomize_noise=False, minibatch_size=sched.minibatch_gpu)
-                  misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes%06d.png' % (cur_nimg // 1000)), drange=drange_net, grid_size=grid_size)
+                  def thunk(_):
+                      grid_fakes = Gs.run(grid_latents, grid_labels, is_validation=True, randomize_noise=False, minibatch_size=sched.minibatch_gpu)
+                      misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes%06d.png' % (cur_nimg // 1000)), drange=drange_net, grid_size=grid_size)
+                  tflex.parallelize([0], thunk)
               if network_snapshot_ticks is not None and cur_tick > 0 and (cur_tick % network_snapshot_ticks == 0 or done):
-                  tflex.save_command()
+                  def thunk(_):
+                      tflex.save_command()
+                  tflex.parallelize([0], thunk)
 
               # Update summaries and RunContext.
               metrics.update_autosummaries()

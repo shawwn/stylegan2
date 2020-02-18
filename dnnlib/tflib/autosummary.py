@@ -92,6 +92,7 @@ def autosummary(name: str, value: TfExpressionEx, passthru: TfExpressionEx = Non
     with tf.control_dependencies([autosummary('l2loss', loss)]):
         n = tf.identity(n)
     """
+    return value
     tfutil.assert_tf_initialized()
     name_id = name.replace("/", "_")
 
@@ -179,6 +180,7 @@ def save_summaries(file_writer, global_step=None):
     """Call FileWriter.add_summary() with all summaries in the default graph,
     automatically finalizing and merging them on the first call.
     """
+    return
     global _merge_op
     tfutil.assert_tf_initialized()
 
@@ -189,4 +191,5 @@ def save_summaries(file_writer, global_step=None):
         with tflex.device(None), tf.control_dependencies(None):
             _merge_op = tf.summary.merge_all()
 
-    file_writer.add_summary(_merge_op.eval(), global_step)
+    if _merge_op is not None:
+        file_writer.add_summary(_merge_op.eval(), global_step)

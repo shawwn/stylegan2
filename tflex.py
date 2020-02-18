@@ -10,6 +10,7 @@ import shutil
 import tempfile
 import traceback
 import time
+import threading
 
 from tensorflow.python.framework import dtypes
 from tensorflow.python.distribute.cluster_resolver import TPUClusterResolver as BaseTPUClusterResolver
@@ -17,15 +18,142 @@ from tensorflow.python.training import server_lib
 from tensorflow.core.protobuf import rewriter_config_pb2
 from tensorflow.contrib import tpu
 
-import threading
+class _DefaultState(threading.local):
+  def __init__(self, **kws):
+    super(_DefaultState, self).__init__()
+    for k, v in kws.items():
+      setattr(self, k, v)
 
-def parallelize(xs, thunk, *args):
+  def save(self):
+    return [(k, v) for k, v in self.__dict__.items()]
+
+  def restore(self, state):
+    for k, v in state:
+      setattr(self, k, v)
+
+local = _DefaultState()
+lock = threading.RLock()
+
+def with_defaults(thunk):
+  with lock:
+    state = local.save()
+    session = tf.get_default_session() or get_default_session()
+    graph = tf.get_default_graph() or get_default_graph()
+  def f(*args, **kws):
+    with lock:
+      local.restore(state)
+    lock.acquire()
+    with session.as_default() if session else nullcontext():
+      with graph.as_default() if graph else nullcontext():
+        lock.release()
+        result = thunk(*args, **kws)
+        lock.acquire()
+    lock.release()
+    return result
+  return f
+
+def get_default(name, required=True):
+  with lock:
+    value = getattr(local, name) if hasattr(local, name) else None
+  if required:
+    assert value is not None
+  return value
+
+def set_default(name, value):
+  with lock:
+    setattr(local, name, value)
+
+def ensure_default(name, value):
+  with lock:
+    current = get_default(name, required=False)
+    if current is None:
+      set_default(name, value)
+    return value
+
+def get_default_session(required=False):
+  return get_default('session', required=required)
+
+def get_default_graph(required=False):
+  return get_default('graph', required=required)
+
+class Future(object):
+  def __init__(self, dependencies, thunk, *args, **kws):
+    if isinstance(dependencies, Future):
+      dependencies = [dependencies]
+    self.dependencies = [defer(_) if callable(_) else _ for _ in dependencies]
+    self.thunk = thunk
+    self.args = args
+    self.kws = kws
+    self.result = None
+    self.complete = False
+    self.thread = None
+    self.daemon = True
+    self.error = None
+  def run(self):
+    try:
+      self.result = self.thunk(*self.args, **self.kws)
+    except Exception as e:
+      traceback.print_exc()
+      self.error = e
+    self.complete = True
+  def run_async(self):
+    assert self.thread is None
+    def thunk():
+      [_.join() for _ in self.dependencies]
+      self.run()
+    self.thread = threading.Thread(target=with_defaults(thunk), daemon=self.daemon)
+    self.thread.start()
+  def join(self):
+    if not self.complete:
+      assert self.thread
+      while not self.complete:
+        time.sleep(1.0)
+    return self.result
+
+def defer(thunk, *args, **kws):
+  dependencies = []
+  if 'dependencies' in kws:
+    dependencies = kws.pop('dependencies')
+  future = Future(dependencies=dependencies, thunk=thunk, *args, **kws)
+  future.run_async()
+  return future
+
+def parallelize(xs, thunk, *args, daemon=True):
   threads = []
   for x in xs:
-    thread = threading.Thread(target=thunk, args=(x, *args))
+    thread = threading.Thread(target=with_defaults(thunk), args=(x, *args), daemon=daemon)
     thread.start()
     threads.append(thread)
   return threads
+
+def parallelize_verbose(label, xs, thunk, *args, daemon=True):
+  xs = [x for x in xs]
+  with tqdm.tqdm(total=len(xs)) as pbar:
+    pbar.set_description(label)
+    def run(*args, **kws):
+      try:
+        return thunk(*args, **kws)
+      finally:
+        pbar.update(1)
+    return parallelize(xs, run, *args, daemon=daemon)
+
+def parallelize_verbose(label, xs, thunk, *args, daemon=True, synchronous=False):
+  xs = [x for x in xs]
+  if synchronous:
+    for i in tqdm.trange(len(xs), desc=label):
+      x = xs[i]
+      thunk(x, *args)
+  else:
+    with tqdm.tqdm(total=len(xs)) as pbar:
+      pbar.set_description(label)
+      threads = parallelize(xs, thunk, *args, daemon=daemon)
+      while len(threads) > 0:
+        for i in range(len(threads)):
+          if not threads[i].is_alive():
+            pbar.update(1)
+            threads.remove(threads[i])
+            break
+        time.sleep(0.1)
 
 # http://stackoverflow.com/questions/1624883/alternative-way-to-split-a-list-into-groups-of-n
 import itertools
@@ -48,6 +176,12 @@ if not hasattr(state, 'noisy'):
 
 if not hasattr(state, 'debug'):
   state.debug = 'DEBUG' in os.environ
+
+if not hasattr(state, 'noisy_backtrace'):
+  state.noisy_backtrace = 'NOISY_BACKTRACE' in os.environ
+
+if not hasattr(state, 'break_next_run'):
+  state.break_next_run = False
 
 def reroute(addr, host=None):
   if host is None or host is False:
@@ -106,7 +240,7 @@ def init_tpu(name, host=None, timeout_in_ms=600 * 60 * 1000):
 
 def get_session(session=None):
   if session is None:
-    session = tf.get_default_session()
+    session = get_default_session()
   return session
 
 def get_devices(session=None):
@@ -169,6 +303,13 @@ def pretty(x, ellipsize=120):
     return r[0:ellipsize - 3] + '...'
   return r
 
+def print_backtrace():
+  try:
+    raise Exception("Printing traceback...")
+  except:
+    import traceback
+    traceback.print_exc()
+
 class Session(tf.Session):
   def __init__(self, target='auto', graph=None, config=None, init_tpu=False, id=None):
     if config is None:
@@ -189,6 +330,9 @@ class Session(tf.Session):
     self._tflex_resolver = resolver
     self._tflex_target = target
     self._tflex_config = config
+    ensure_default('session', self)
+    ensure_default('devices', self.list_devices())
+    ensure_default('graph', self.graph)
 
   @property
   def _spec(self):
@@ -202,15 +346,21 @@ class Session(tf.Session):
       self.init_tpu = None
 
   def run(self, *args, **kws):
+    if state.break_next_run:
+      import pdb; pdb.set_trace()
     if state.debug:
       check_commands()
     if state.noisy:
       print(self._spec, 'Session.run', *[pretty(x) for x in args], *[pretty(k)+'='+pretty(v) for k, v in kws.items()])
+      if state.noisy_backtrace:
+        print_backtrace()
     start = time.time()
     result = super(Session, self).run(*args, **kws)
     elapsed = time.time() - start
     if state.noisy:
       print(self._spec, 'Session.run (finished in %.2fs)' % elapsed, pretty(result), *[pretty(x) for x in args], *[pretty(k)+'='+pretty(v) for k, v in kws.items()])
+      if state.noisy_backtrace:
+        print_backtrace()
     return result
 
 
@@ -256,7 +406,7 @@ def truncate_value(variable, value, reshape=True):
 from tensorflow.core.protobuf import config_pb2
 
 def initialize_tpu(session=None, timeout_in_ms=None):
-  session = session or tf.get_default_session()
+  session = session or get_default_session()
   with session.as_default():
     op = tpu.initialize_system()
   options = None
@@ -265,7 +415,7 @@ def initialize_tpu(session=None, timeout_in_ms=None):
   return session.run(op, options=options)
 
 def load(variable, value, session=None, timeout_in_ms=None):
-  session = session or tf.get_default_session()
+  session = session or get_default_session()
   ops = variable.initializer
   vals = dict([(variable.initializer.inputs[1], value)])
   #for x, (k, v) in zip(variables, vals.items()):
@@ -276,7 +426,7 @@ def load(variable, value, session=None, timeout_in_ms=None):
   return session.run(ops, vals, options=options)
 
 def eval(variable, session=None, timeout_in_ms=None):
-  session = session or tf.get_default_session()
+  session = session or get_default_session()
   options = None
   if timeout_in_ms:
     options=config_pb2.RunOptions(timeout_in_ms=timeout_in_ms)
@@ -290,9 +440,11 @@ def grab_values(variables, reader, reshape=False):
     yield variable, value
 
 def assign_values(variables, values, session=None, timeout_in_ms=60000):
-  session = session or tf.get_default_session()
+  session = session or get_default_session()
+  variables = [x for x in variables]
+  values = [x for x in values]
   ops = [x.initializer for x in variables]
-  vals = dict([(x.initializer.inputs[1], value) for x, value in zip(variables, values)]) # TODO: bfloat16 support
+  vals = dict([(x.initializer.inputs[1], value.value() if isinstance(value, tf.Variable) else value) for x, value in zip(variables, values)]) # TODO: bfloat16 support
   #for x, (k, v) in zip(variables, vals.items()):
   #  print(x.name, x.shape.as_list(), k, v.shape)
   options = None
@@ -301,7 +453,7 @@ def assign_values(variables, values, session=None, timeout_in_ms=60000):
   session.run(ops, vals, options=options)
 
 def load_snapshot(ckpt, session=None, var_list=None, reshape=False):
-  session = session or tf.get_default_session()
+  session = session or get_default_session()
   reader = pywrap_tensorflow.NewCheckpointReader(ckpt)
   vs = var_list or tf.trainable_variables()
   for variables in tqdm.tqdm(list(split_by_params(vs))):
@@ -318,7 +470,7 @@ def get_variable(name, var_list=None):
           return x
 
 def load_weights(ckpt, session=None, var_list=None, reshape=False):
-  session = session or tf.get_default_session()
+  session = session or get_default_session()
   vs = var_list or tf.trainable_variables()
   files = list(sorted(glob(ckpt + '-*.npy')))
   for out in tqdm.tqdm(files):
@@ -331,7 +483,7 @@ def load_weights(ckpt, session=None, var_list=None, reshape=False):
         variable.load(value, session)
 
 def load_variables(ckpt, session=None, var_list=None, reshape=False):
-  session = session or tf.get_default_session()
+  session = session or get_default_session()
   vs = var_list or tf.trainable_variables()
   with h5py.File(ckpt, "r") as f:
     for variables in tqdm.tqdm(list(split_by_params(vs))):
@@ -348,7 +500,7 @@ state.cache_ops = {}
 
 def cast_variables(variables, graph=None, cache_ops=None):
   if graph is None:
-    graph = tf.get_default_graph()
+    graph = get_default_graph()
   if cache_ops is None:
     cache_ops = state.cache_ops
   if graph not in cache_ops:
@@ -374,7 +526,7 @@ def variable_name(variable):
   return variable.name
 
 def save_variables(ckpt, session=None, var_list=None):
-    session = session or tf.get_default_session()
+    session = session or get_default_session()
     vs = var_list or tf.trainable_variables()
     maketree(os.path.dirname(ckpt))
     fname = ckpt+'.tmp'
@@ -392,14 +544,14 @@ def save_variables(ckpt, session=None, var_list=None):
     os.rename(ckpt+'.tmp', ckpt)
 
 def fetch_variables(session=None, var_list=None):
-    session = session or tf.get_default_session()
+    session = session or get_default_session()
     vs = var_list or tf.trainable_variables()
     for variables in tqdm.tqdm(list(split_by_params(vs))):
       values = session.run(variables)
       yield variables, values
 
 def partition_variables(session=None, var_list=None):
-    session = session or tf.get_default_session()
+    session = session or get_default_session()
     vs = var_list or tf.trainable_variables()
     for variables in tqdm.tqdm(list(split_by_params(vs))):
       yield variables

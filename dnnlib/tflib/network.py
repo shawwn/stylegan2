@@ -71,7 +71,7 @@ class Network:
         var_global_to_local: Mapping from variable global names to local names.
     """
 
-    def __init__(self, name: str = None, func_name: Any = None, **static_kwargs):
+    def __init__(self, name: str = None, func_name: Any = None, reset_own_vars = True, **static_kwargs):
         tfutil.assert_tf_initialized()
         assert isinstance(name, str) or name is None
         assert func_name is not None
@@ -96,7 +96,16 @@ class Network:
 
         # Init TensorFlow graph.
         self._init_graph()
-        self.reset_own_vars()
+        if reset_own_vars:
+            self.ensure()
+
+    def ensure(self):
+        for k, v in self.components.items():
+            v.ensure()
+        if self._need_reset:
+            self.reset_own_vars()
+            self._need_reset = False
+        return self
 
     def _init_fields(self) -> None:
         self.name = None
@@ -122,8 +131,13 @@ class Network:
         self._build_func_name = None  # Name of the build function.
         self._build_module_src = None  # Full source code of the module containing the build function.
         self._run_cache = dict()  # Cached graph data for Network.run().
+        self._need_reset = True
 
     def _init_graph(self) -> None:
+        with tflex.lock:
+            self._init_graph_()
+
+    def _init_graph_(self) -> None:
         # Collect inputs.
         self.input_names = []
 
@@ -311,23 +325,24 @@ class Network:
         net._build_func_name = self._build_func_name
         net._build_func = self._build_func
         net._init_graph()
-        net.copy_vars_from(self)
+        self.ensure()
+        net.ensure().copy_vars_from(self)
         return net
 
     def copy_own_vars_from(self, src_net: "Network") -> None:
         """Copy the values of all variables from the given network, excluding sub-networks."""
         names = [name for name in self.own_vars.keys() if name in src_net.own_vars]
-        tfutil.set_vars(tfutil.run({self.vars[name]: src_net.vars[name] for name in names}))
+        tfutil.set_vars({self.vars[name]: src_net.vars[name] for name in names})
 
     def copy_vars_from(self, src_net: "Network") -> None:
         """Copy the values of all variables from the given network, including sub-networks."""
         names = [name for name in self.vars.keys() if name in src_net.vars]
-        tfutil.set_vars(tfutil.run({self.vars[name]: src_net.vars[name] for name in names}))
+        tfutil.set_vars({self.vars[name]: src_net.vars[name] for name in names})
 
     def copy_trainables_from(self, src_net: "Network") -> None:
         """Copy the values of all trainable variables from the given network, including sub-networks."""
         names = [name for name in self.trainables.keys() if name in src_net.trainables]
-        tfutil.set_vars(tfutil.run({self.vars[name]: src_net.vars[name] for name in names}))
+        tfutil.set_vars({self.vars[name]: src_net.vars[name] for name in names})
 
     def convert(self, new_func_name: str, new_name: str = None, **new_static_kwargs) -> "Network":
         """Create new network with the given parameters, and copy all variables from this network."""

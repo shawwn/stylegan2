@@ -299,16 +299,17 @@ class Optimizer:
                     if self.use_loss_scaling:
                         all_ops.append(autosummary.autosummary(self.id + "/loss_scaling_log2", device.loss_scaling_var))
 
-        # Initialize variables.
-        self.reset_optimizer_state()
-        if self.use_loss_scaling:
-            tfutil.init_uninitialized_vars([device.loss_scaling_var for device in self._devices.values()])
-        if self.minibatch_multiplier is not None:
-            tfutil.run([var.initializer for device in self._devices.values() for var in list(device.grad_acc_vars.values()) + [device.grad_acc_count]])
+        def finalize():
+            # Initialize variables.
+            self.reset_optimizer_state()
+            if self.use_loss_scaling:
+                tfutil.init_uninitialized_vars([device.loss_scaling_var for device in self._devices.values()])
+            if self.minibatch_multiplier is not None:
+                tfutil.run([var.initializer for device in self._devices.values() for var in list(device.grad_acc_vars.values()) + [device.grad_acc_count]])
 
         # Group everything into a single op.
         with tfutil.absolute_name_scope(self.scope):
-            return tf.group(*all_ops, name="TrainingOp")
+            return tf.group(*all_ops, name="TrainingOp"), finalize
 
     def reset_optimizer_state(self) -> None:
         """Reset internal state of the underlying optimizer."""
