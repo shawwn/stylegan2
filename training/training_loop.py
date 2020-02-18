@@ -158,7 +158,8 @@ def get_input_fn(load_training_set):
         #labels = np.ones((8, 1), dtype=np.float32)
         #features, labels = training_set.get_minibatch_np(batch_size)
         #import pdb; pdb.set_trace()
-        training_set = load_training_set(batch_size=0)
+        #training_set = load_training_set(batch_size=0)
+        training_set = load_training_set(batch_size=batch_size)
         num_channels = training_set.shape[0]
         resolution = training_set.shape[1]
         label_size = training_set.label_size
@@ -169,16 +170,22 @@ def get_input_fn(load_training_set):
             def dataset_parser_dynamic(features, labels):
                 #features, labels = set_shapes(batch_size, num_channels, resolution, label_size, features, labels)
                 #features, labels = set_shapes(None, num_channels, resolution, label_size, features, labels)
-                features = tf.cast(features, tf.float32)
+                features, labels = process_reals(features, labels, lod=0.0, mirror_augment=False, drange_data=training_set.dynamic_range, drange_net=[-1, 1])
+                #features = tf.cast(features, tf.float32)
                 return features, labels
 
             #import pdb; pdb.set_trace()
-            dataset = dataset.apply(
-                tf.contrib.data.map_and_batch(
-                    dataset_parser_dynamic,
-                    batch_size=batch_size,
-                    num_parallel_batches=num_cores,
-                    drop_remainder=True))
+            if False:
+                dataset = dataset.apply(
+                    tf.contrib.data.map_and_batch(
+                        dataset_parser_dynamic,
+                        batch_size=batch_size,
+                        num_parallel_batches=num_cores,
+                        drop_remainder=True))
+            else:
+                dataset = dataset.map(
+                        dataset_parser_dynamic,
+                        num_parallel_calls=tf.data.experimental.AUTOTUNE)
             #import pdb; pdb.set_trace()
 
             # Assign static batch size dimension
@@ -187,10 +194,11 @@ def get_input_fn(load_training_set):
 
             # Prefetch overlaps in-feed with training
             #if self.prefetch_depth_auto_tune:
-            if True:
-                dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
-            else:
-                dataset = dataset.prefetch(4)
+            if False:
+                if True:
+                    dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
+                else:
+                    dataset = dataset.prefetch(4)
         else:
             #training_set.configure(batch_size)
             features, labels = training_set.get_minibatch_tf()
