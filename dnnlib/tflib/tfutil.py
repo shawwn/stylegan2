@@ -241,6 +241,15 @@ def create_var_with_large_initial_value(initial_value: np.ndarray, *args, **kwar
     set_vars({var: initial_value})
     return var
 
+def create_var_with_large_initial_value2(initial_value: np.ndarray, *args, **kwargs):
+    """Create tf.Variable with large initial value without bloating the tf graph."""
+    assert_tf_initialized()
+    assert isinstance(initial_value, np.ndarray)
+    zeros = tf.zeros(initial_value.shape, initial_value.dtype)
+    var = tf.Variable(zeros, *args, **kwargs)
+    return var, tf.assign(var, initial_value)
+
+
 
 def convert_images_from_uint8(images, drange=[-1,1], nhwc_to_nchw=False):
     """Convert a minibatch of images from uint8 to float32 with configurable dynamic range.

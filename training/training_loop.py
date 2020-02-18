@@ -105,6 +105,104 @@ def training_schedule(
     s.tick_kimg = tick_kimg_dict.get(s.resolution, tick_kimg_base)
     return s
 
+def get_input_fn(training_set, batch_size):
+    zz = training_set.get_minibatch_np(batch_size)
+    features = zz[0]
+    labels = zz[1]
+    dataset = tf.data.Dataset.from_tensor_slices((features, labels))
+    def input_fn(params):
+        batch_size = params["batch_size"]
+        #features = {"x": np.ones((8, 3), dtype=np.float32)}
+        #labels = np.ones((8, 1), dtype=np.float32)
+        return dataset.repeat().batch(batch_size, drop_remainder=True)
+    return dataset, input_fn
+
+def get_input_fn(training_set):
+    def input_fn(params):
+        import pdb; pdb.set_trace()
+        batch_size = params["batch_size"]
+        features, labels = training_set.get_minibatch_np(batch_size)
+        features = tf.cast(features, dtype=tf.float32)
+        labels = tf.cast(labels, dtype=tf.float32)
+        dataset = tf.data.Dataset.from_tensor_slices((features, labels))
+        return dataset.repeat().batch(batch_size, drop_remainder=True)
+    return input_fn
+
+
+def set_shapes(batch_size, num_channels, resolution, label_size, images, labels, transpose_input=False):
+    """Statically set the batch_size dimension."""
+    #import pdb; pdb.set_trace()
+    if transpose_input:
+        #if FLAGS.train_batch_size // FLAGS.num_cores > 8:
+        if True:
+            shape = [resolution, resolution, num_channels, batch_size]
+        else:
+            shape = [resolution, resolution, batch_size, num_channels]
+        images.set_shape(images.get_shape().merge_with(tf.TensorShape(shape)))
+        images = tf.reshape(images, [-1])
+        labels.set_shape(labels.get_shape().merge_with(
+            tf.TensorShape([batch_size, label_size])))
+    else:
+        images.set_shape(images.get_shape().merge_with(
+            tf.TensorShape([batch_size, num_channels, resolution, resolution])))
+        labels.set_shape(labels.get_shape().merge_with(
+            tf.TensorShape([batch_size, label_size])))
+    return images, labels
+
+import functools
+
+def get_input_fn(load_training_set):
+    def input_fn(params):
+        batch_size = params["batch_size"]
+        #features = {"x": np.ones((8, 3), dtype=np.float32)}
+        #labels = np.ones((8, 1), dtype=np.float32)
+        #features, labels = training_set.get_minibatch_np(batch_size)
+        #import pdb; pdb.set_trace()
+        training_set = load_training_set(batch_size=0)
+        num_channels = training_set.shape[0]
+        resolution = training_set.shape[1]
+        label_size = training_set.label_size
+        num_cores = batch_size
+        if True:
+            dataset = training_set._tf_datasets[0]
+
+            def dataset_parser_dynamic(features, labels):
+                #features, labels = set_shapes(batch_size, num_channels, resolution, label_size, features, labels)
+                #features, labels = set_shapes(None, num_channels, resolution, label_size, features, labels)
+                features = tf.cast(features, tf.float32)
+                return features, labels
+
+            #import pdb; pdb.set_trace()
+            dataset = dataset.apply(
+                tf.contrib.data.map_and_batch(
+                    dataset_parser_dynamic,
+                    batch_size=batch_size,
+                    num_parallel_batches=num_cores,
+                    drop_remainder=True))
+            #import pdb; pdb.set_trace()
+
+            # Assign static batch size dimension
+            dataset = dataset.map(functools.partial(set_shapes, batch_size, num_channels, resolution, label_size))
+            #import pdb; pdb.set_trace()
+
+            # Prefetch overlaps in-feed with training
+            #if self.prefetch_depth_auto_tune:
+            if True:
+                dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
+            else:
+                dataset = dataset.prefetch(4)
+        else:
+            #training_set.configure(batch_size)
+            features, labels = training_set.get_minibatch_tf()
+            features.set_shape((batch_size, num_channels, resolution, resolution))
+            labels.set_shape((batch_size, label_size))
+            features = tf.cast(features, dtype=tf.float32)
+            labels = tf.cast(labels, dtype=tf.float32)
+            dataset = tf.data.Dataset.from_tensor_slices((features, labels))
+            dataset = dataset.repeat().batch(batch_size, drop_remainder=True)
+        return dataset
+    return input_fn
+
 #----------------------------------------------------------------------------
 # Main training script.
 
@@ -151,7 +249,105 @@ def training_loop(
     num_gpus = dnnlib.submit_config.num_gpus
 
     # Load training set.
-    training_set = dataset.load_dataset(data_dir=dnnlib.convert_path(data_dir), verbose=True, **dataset_args)
+    #training_set = dataset.load_dataset(data_dir=dnnlib.convert_path(data_dir), verbose=True, **dataset_args)
+    #import pdb; pdb.set_trace()
+    #dset, input_fn = get_input_fn(training_set, num_gpus*32)
+    def load_training_set(**kws):
+        return dataset.load_dataset(data_dir=dnnlib.convert_path(data_dir), verbose=True, **dataset_args, **kws)
+    input_fn = get_input_fn(load_training_set)
+
+    def model_fn(features, labels, mode, params):
+        nonlocal G_opt_args, D_opt_args, G_reg_interval, D_reg_interval, lazy_regularization
+        #import pdb; pdb.set_trace()
+        #training_set = params['training_set']
+        class TrainingSetStub(object):
+            def __init__(self, labels):
+                self._labels = labels
+            def get_random_labels_tf(self, batch_size):
+                return self._labels
+        training_set = TrainingSetStub(labels)
+        num_channels = features.shape[1].value
+        resolution = features.shape[2].value
+        label_size = labels.shape[1].value
+        G = tflib.Network('G', num_channels=num_channels, resolution=resolution, label_size=label_size, **G_args)
+        D = tflib.Network('D', num_channels=num_channels, resolution=resolution, label_size=label_size, **D_args)
+        G_gpu = G
+        D_gpu = D
+        reals_read = features
+        labels_read = labels
+        minibatch_gpu_in = params['batch_size']
+        G_opt_args = dict(G_opt_args)
+        D_opt_args = dict(D_opt_args)
+        G_opt = tflib.Optimizer(name='TrainG', cross_shard=True, **G_opt_args)
+        D_opt = tflib.Optimizer(name='TrainD', cross_shard=True, **D_opt_args)
+        G_reg_opt = tflib.Optimizer(name='RegG', share=G_opt, cross_shard=True, **G_opt_args)
+        D_reg_opt = tflib.Optimizer(name='RegD', share=D_opt, cross_shard=True, **D_opt_args)
+        #import pdb; pdb.set_trace()
+        with tf.name_scope('G_loss'):
+            G_loss, G_reg = dnnlib.util.call_func_by_name(G=G_gpu, D=D_gpu, opt=G_opt, training_set=training_set,
+                                                          minibatch_size=minibatch_gpu_in, **G_loss_args)
+        with tf.name_scope('D_loss'):
+            D_loss, D_reg = dnnlib.util.call_func_by_name(G=G_gpu, D=D_gpu, opt=D_opt, training_set=training_set,
+                                                          minibatch_size=minibatch_gpu_in, reals=reals_read,
+                                                          labels=labels_read, **D_loss_args)
+        #import pdb; pdb.set_trace()
+
+        # Register gradients.
+        if not lazy_regularization:
+            G_reg_loss = G_reg
+            D_reg_loss = D_reg
+            if G_reg is not None: G_loss += G_reg
+            if D_reg is not None: D_loss += D_reg
+        else:
+            G_reg_loss = tf.reduce_mean(G_reg * G_reg_interval)
+            D_reg_loss = tf.reduce_mean(D_reg * D_reg_interval)
+            if G_reg is not None: G_reg_opt.register_gradients(G_reg_loss, G_gpu.trainables)
+            if D_reg is not None: D_reg_opt.register_gradients(D_reg_loss, D_gpu.trainables)
+        G_loss_op = tf.reduce_mean(G_loss)
+        D_loss_op = tf.reduce_mean(D_loss)
+        G_opt.register_gradients(G_loss_op, G_gpu.trainables)
+        D_opt.register_gradients(D_loss_op, D_gpu.trainables)
+        G_train_op = G_opt._shared_optimizers[''].minimize(G_loss)
+        D_train_op = D_opt._shared_optimizers[''].minimize(D_loss)
+        G_reg_train_op = G_reg_opt._shared_optimizers[''].minimize(G_reg_loss) if G_reg_loss is not None else tf.no_op()
+        D_reg_train_op = G_reg_opt._shared_optimizers[''].minimize(D_reg_loss) if D_reg_loss is not None else tf.no_op()
+        loss = G_loss_op + D_loss_op
+        if G_reg_loss is not None: loss += G_reg_loss
+        if D_reg_loss is not None: loss += D_reg_loss
+        with tf.control_dependencies([G_train_op]):
+            train_op = tf.group(D_train_op, G_reg_train_op, D_reg_train_op, name='train_op')
+        #import pdb; pdb.set_trace()
+
+        #train_op = G_opt.minimize(G_loss, global_step=tf.train.get_or_create_global_step())
+        return tf.contrib.tpu.TPUEstimatorSpec(
+            mode=mode,
+            loss=loss,
+            train_op=train_op)
+
+        #import pdb; pdb.set_trace()
+
+    use_tpu = True
+    training_steps = 1
+    batch_size = 8
+    model_dir='gs://danbooru-euw4a/test/run1/'
+    if tf.gfile.Exists(model_dir):
+      tf.gfile.DeleteRecursively(model_dir)
+    tpu_cluster_resolver = tflex.get_tpu_resolver()
+    run_config = tf.contrib.tpu.RunConfig(
+        model_dir=model_dir,
+        save_checkpoints_steps=1,
+        cluster=tpu_cluster_resolver,
+        tpu_config=tf.contrib.tpu.TPUConfig(iterations_per_loop=1))
+    estimator = tf.contrib.tpu.TPUEstimator(
+        config=run_config,
+        use_tpu=use_tpu,
+        model_fn=model_fn,
+        train_batch_size=batch_size)
+    #import pdb; pdb.set_trace()
+    print('Training...')
+    estimator.train(input_fn, steps=training_steps)
+    import pdb; pdb.set_trace()
+
     grid_size, grid_reals, grid_labels = misc.setup_snapshot_image_grid(training_set, **grid_args)
     misc.save_image_grid(grid_reals, dnnlib.make_run_dir_path('reals.png'), drange=training_set.dynamic_range, grid_size=grid_size)
 

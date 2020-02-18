@@ -31,6 +31,7 @@ class TFRecordDataset:
         shuffle_mb      = 4096,     # Shuffle data within specified window (megabytes), 0 = disable shuffling.
         prefetch_mb     = 2048,     # Amount of data to prefetch (megabytes), 0 = disable prefetching.
         buffer_mb       = 256,      # Read buffer size (megabytes).
+        batch_size      = None,     # Fixed batch size
         num_threads     = 2):       # Number of concurrent threads.
 
         self.tfrecord_dir       = tfrecord_dir
@@ -96,9 +97,10 @@ class TFRecordDataset:
 
         # Build TF expressions.
         with tf.name_scope('Dataset'), tflex.device('/cpu:0'):
-            self._tf_minibatch_in = tf.placeholder(tf.int64, name='minibatch_in', shape=[])
-            self._tf_labels_var = tflib.create_var_with_large_initial_value(self._np_labels, name='labels_var')
-            self._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(self._tf_labels_var)
+            self._tf_minibatch_in = batch_size if batch_size is not None or batch_size <= 0 else tf.placeholder(tf.int64, name='minibatch_in', shape=[])
+            self._tf_labels_var, self._tf_labels_init = tflib.create_var_with_large_initial_value2(self._np_labels, name='labels_var')
+            with tf.control_dependencies([self._tf_labels_init]):
+                self._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(self._tf_labels_var)
             for tfr_file, tfr_shape, tfr_lod in zip(tfr_files, tfr_shapes, tfr_lods):
                 if tfr_lod < 0:
                     continue
@@ -114,10 +116,11 @@ class TFRecordDataset:
                     dset = dset.repeat()
                 if prefetch_mb > 0:
                     dset = dset.prefetch(((prefetch_mb << 20) - 1) // bytes_per_item + 1)
-                dset = dset.batch(self._tf_minibatch_in)
+                if batch_size is None or batch_size > 0:
+                    dset = dset.batch(self._tf_minibatch_in)
                 self._tf_datasets[tfr_lod] = dset
             self._tf_iterator = tf.data.Iterator.from_structure(self._tf_datasets[0].output_types, self._tf_datasets[0].output_shapes)
-            self._tf_init_ops = {lod: self._tf_iterator.make_initializer(dset) for lod, dset in self._tf_datasets.items()}
+            self._tf_init_ops = {lod: self._tf_iterator.make_initializer(dset) if batch_size is None else tf.no_op() for lod, dset in self._tf_datasets.items()}
 
     def close(self):
         pass
