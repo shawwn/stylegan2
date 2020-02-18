@@ -238,6 +238,7 @@ def training_loop(
             return shards[i]
     def make_generator(gpu):
         me = get_shard(gpu)
+        prev = None if gpu <= 0 else get_shard(gpu - 1)
         with tf.name_scope('GPU%d' % gpu), tflex.device('/gpu:%d' % gpu):
             # Create GPU-specific shadow copies of G and D.
             G_gpu, G_final = (G, None) if gpu == 0 else G.clone2(G.name + '_shadow')
@@ -245,8 +246,8 @@ def training_loop(
         with tflex.lock:
             me.G = G_gpu
             me.D = D_gpu
-            me.G_final = tflex.defer(G_final)
-            me.D_final = tflex.defer(D_final)
+            me.G_final = tflex.defer(G_final, dependencies=[prev.G_final] if prev else [])
+            me.D_final = tflex.defer(D_final, dependencies=[prev.D_final] if prev else [])
     print('Making generators...')
     tflex.parallelize_verbose("Generator", range(num_gpus), make_generator, synchronous=True)
     print('Finalizing clones...')
