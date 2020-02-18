@@ -240,13 +240,23 @@ def training_loop(
         me = get_shard(gpu)
         with tf.name_scope('GPU%d' % gpu), tflex.device('/gpu:%d' % gpu):
             # Create GPU-specific shadow copies of G and D.
-            G_gpu = G if gpu == 0 else G.clone(G.name + '_shadow')
-            D_gpu = D if gpu == 0 else D.clone(D.name + '_shadow')
+            G_gpu, G_final = (G, None) if gpu == 0 else G.clone2(G.name + '_shadow')
+            D_gpu, D_final = (D, None) if gpu == 0 else D.clone2(D.name + '_shadow')
         with tflex.lock:
             me.G = G_gpu
             me.D = D_gpu
+            me.G_final = G_final
+            me.D_final = D_final
     print('Making generators...')
     tflex.parallelize_verbose("Generator", range(num_gpus), make_generator, synchronous=True)
+    print('Cloning shadows...')
+    def make_shadow(gpu):
+        me = get_shard(gpu)
+        if callable(me.G_final):
+            me.G_final()
+        if callable(me.D_final):
+            me.D_final()
+    tflex.parallelize_verbose("Shadow", range(num_gpus), make_shadow, synchronous=False)
 
     def make_shard(gpu):
         nonlocal data_fetch_ops

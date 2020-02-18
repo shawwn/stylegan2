@@ -71,7 +71,7 @@ class Network:
         var_global_to_local: Mapping from variable global names to local names.
     """
 
-    def __init__(self, name: str = None, func_name: Any = None, reset_own_vars = True, **static_kwargs):
+    def __init__(self, name: str = None, func_name: Any = None, reset_own_vars = False, **static_kwargs):
         tfutil.assert_tf_initialized()
         assert isinstance(name, str) or name is None
         assert func_name is not None
@@ -315,6 +315,12 @@ class Network:
 
     def clone(self, name: str = None, **new_static_kwargs) -> "Network":
         """Create a clone of this network with its own copy of the variables."""
+        net, finalize = self.clone2(name, **new_static_kwargs)
+        finalize()
+        return net
+
+    def clone2(self, name: str = None, **new_static_kwargs) -> ("Network", Any):
+        """Create a clone of this network with its own copy of the variables."""
         # pylint: disable=protected-access
         net = object.__new__(Network)
         net._init_fields()
@@ -325,9 +331,11 @@ class Network:
         net._build_func_name = self._build_func_name
         net._build_func = self._build_func
         net._init_graph()
-        self.ensure()
-        net.ensure().copy_vars_from(self)
-        return net
+        def finalize():
+            self.ensure()
+            net.ensure()
+            net.copy_vars_from(self)
+        return net, finalize
 
     def copy_own_vars_from(self, src_net: "Network") -> None:
         """Copy the values of all variables from the given network, excluding sub-networks."""
