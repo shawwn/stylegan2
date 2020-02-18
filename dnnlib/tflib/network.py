@@ -158,12 +158,12 @@ class Network:
         build_kwargs["components"] = self.components
 
         # Build template graph.
-        with tfutil.absolute_variable_scope(self.scope, reuse=False), tfutil.absolute_name_scope(self.scope):  # ignore surrounding scopes
-            assert tf.get_variable_scope().name == self.scope
-            assert tf.get_default_graph().get_name_scope() == self.scope
-            with tf.control_dependencies(None):  # ignore surrounding control dependencies
-                self.input_templates = [tf.placeholder(tf.float32, name=name) for name in self.input_names]
-                with tflex.lock:
+        with tflex.lock:
+            with tfutil.absolute_variable_scope(self.scope, reuse=False), tfutil.absolute_name_scope(self.scope):  # ignore surrounding scopes
+                assert tf.get_variable_scope().name == self.scope
+                assert tf.get_default_graph().get_name_scope() == self.scope
+                with tf.control_dependencies(None):  # ignore surrounding control dependencies
+                    self.input_templates = [tf.placeholder(tf.float32, name=name) for name in self.input_names]
                     out_expr = self._build_func(*self.input_templates, **build_kwargs)
 
         # Collect outputs.
