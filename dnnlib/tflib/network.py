@@ -134,10 +134,6 @@ class Network:
         self._need_reset = True
 
     def _init_graph(self) -> None:
-        with tflex.lock:
-            self._init_graph_()
-
-    def _init_graph_(self) -> None:
         # Collect inputs.
         self.input_names = []
 
@@ -152,8 +148,9 @@ class Network:
         if self.name is None:
             self.name = self._build_func_name
         assert re.match("^[A-Za-z0-9_.\\-]*$", self.name)
-        with tf.name_scope(None):
-            self.scope = tf.get_default_graph().unique_name(self.name, mark_as_used=True)
+        with tflex.lock:
+            with tf.name_scope(None):
+                self.scope = tf.get_default_graph().unique_name(self.name, mark_as_used=True)
 
         # Finalize build func kwargs.
         build_kwargs = dict(self.static_kwargs)
@@ -166,7 +163,8 @@ class Network:
             assert tf.get_default_graph().get_name_scope() == self.scope
             with tf.control_dependencies(None):  # ignore surrounding control dependencies
                 self.input_templates = [tf.placeholder(tf.float32, name=name) for name in self.input_names]
-                out_expr = self._build_func(*self.input_templates, **build_kwargs)
+                with tflex.lock:
+                    out_expr = self._build_func(*self.input_templates, **build_kwargs)
 
         # Collect outputs.
         assert tfutil.is_tf_expression(out_expr) or isinstance(out_expr, tuple)
