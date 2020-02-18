@@ -334,8 +334,9 @@ class Network:
         net._build_func = self._build_func
         net._init_graph()
         def finalize():
-            self.ensure()
-            net.ensure()
+            with tflex.network_lock:
+                self.ensure()
+                net.ensure()
             net.copy_vars_from(self)
         return net, finalize
 
