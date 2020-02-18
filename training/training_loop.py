@@ -150,22 +150,56 @@ def set_shapes(batch_size, num_channels, resolution, label_size, images, labels,
     return images, labels
 
 import functools
+from tensorflow.python.platform import gfile
 
-def get_input_fn(load_training_set):
+def get_input_fn(load_training_set, num_cores):
+    training_set = load_training_set(batch_size=0)
+    num_channels = training_set.shape[0]
+    resolution = training_set.shape[1]
+    resolution_log2 = int(np.log2(resolution))
+    label_size = training_set.label_size
+    assert gfile.IsDirectory(training_set.tfrecord_dir)
+    tfr_files = sorted(tf.io.gfile.glob(os.path.join(training_set.tfrecord_dir, '*-r%02d.tfrecords' % resolution_log2)))
+    assert len(tfr_files) == 1
+
     def input_fn(params):
         batch_size = params["batch_size"]
-        #features = {"x": np.ones((8, 3), dtype=np.float32)}
-        #labels = np.ones((8, 1), dtype=np.float32)
-        #features, labels = training_set.get_minibatch_np(batch_size)
-        #import pdb; pdb.set_trace()
-        #training_set = load_training_set(batch_size=0)
-        training_set = load_training_set(batch_size=batch_size)
-        num_channels = training_set.shape[0]
-        resolution = training_set.shape[1]
-        label_size = training_set.label_size
-        num_cores = batch_size
+        #num_cores = batch_size
         if True:
-            dataset = training_set._tf_datasets[0]
+            #dset = training_set._tf_datasets[0]
+            #dset = tf.data.TFRecordDataset(tfr_file, compression_type='', buffer_size=buffer_mb << 20)
+            dset = tf.data.Dataset.from_tensor_slices(tfr_files)
+            dset = dset.apply(
+                tf.data.experimental.parallel_interleave(tf.data.TFRecordDataset, cycle_length=4, sloppy=True))
+
+            def _parse_function(example_proto):
+                features = {
+                    "hash": tf.VarLenFeature(tf.string),
+                    "text": tf.VarLenFeature(tf.int64)
+                }
+                parsed_features = tf.parse_single_example(example_proto, features)
+                return parsed_features["text"], parsed_features["text"].dense_shape[0]
+
+            _tf_labels_var, _tf_labels_init = tflib.create_var_with_large_initial_value2(training_set._np_labels, name='labels_var')
+            with tf.control_dependencies([_tf_labels_init]):
+                _tf_labels_dataset = tf.data.Dataset.from_tensor_slices(_tf_labels_var)
+            dset = dset.map(dataset.TFRecordDataset.parse_tfrecord_tf, num_parallel_calls=2)
+            dset = tf.data.Dataset.zip((dset, _tf_labels_dataset))
+
+            shuffle_mb = 4096  # Shuffle data within specified window (megabytes), 0 = disable shuffling.
+            prefetch_mb = 2048  # Amount of data to prefetch (megabytes), 0 = disable prefetching.
+
+            tfr_shape = (resolution, resolution, 3)
+            bytes_per_item = np.prod(tfr_shape) * np.dtype(training_set.dtype).itemsize
+            if shuffle_mb > 0:
+                dset = dset.shuffle(((shuffle_mb << 20) - 1) // bytes_per_item + 1)
+            repeat = True
+            if repeat:
+                dset = dset.repeat()
+            if prefetch_mb > 0:
+                dset = dset.prefetch(((prefetch_mb << 20) - 1) // bytes_per_item + 1)
+            dset = dset.batch(batch_size)
+            #dset = tf.data.TFRecordDataset(tfr_file)
 
             def dataset_parser_dynamic(features, labels):
                 #features, labels = set_shapes(batch_size, num_channels, resolution, label_size, features, labels)
@@ -176,29 +210,29 @@ def get_input_fn(load_training_set):
 
             #import pdb; pdb.set_trace()
             if False:
-                dataset = dataset.apply(
+                dset = dset.apply(
                     tf.contrib.data.map_and_batch(
                         dataset_parser_dynamic,
                         batch_size=batch_size,
-                        num_parallel_batches=num_cores,
+                        num_parallel_batches=tf.data.experimental.AUTOTUNE,
                         drop_remainder=True))
             else:
-                dataset = dataset.map(
+                dset = dset.map(
                         dataset_parser_dynamic,
                         num_parallel_calls=tf.data.experimental.AUTOTUNE)
             #import pdb; pdb.set_trace()
 
             # Assign static batch size dimension
-            dataset = dataset.map(functools.partial(set_shapes, batch_size, num_channels, resolution, label_size))
+            dset = dset.map(functools.partial(set_shapes, batch_size, num_channels, resolution, label_size))
             #import pdb; pdb.set_trace()
 
             # Prefetch overlaps in-feed with training
             #if self.prefetch_depth_auto_tune:
             if False:
                 if True:
-                    dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
+                    dset = dset.prefetch(tf.contrib.data.AUTOTUNE)
                 else:
-                    dataset = dataset.prefetch(4)
+                    dset = dset.prefetch(4)
         else:
             #training_set.configure(batch_size)
             features, labels = training_set.get_minibatch_tf()
@@ -206,9 +240,9 @@ def get_input_fn(load_training_set):
             labels.set_shape((batch_size, label_size))
             features = tf.cast(features, dtype=tf.float32)
             labels = tf.cast(labels, dtype=tf.float32)
-            dataset = tf.data.Dataset.from_tensor_slices((features, labels))
-            dataset = dataset.repeat().batch(batch_size, drop_remainder=True)
-        return dataset
+            dset = tf.data.Dataset.from_tensor_slices((features, labels))
+            dset = dset.repeat().batch(batch_size, drop_remainder=True)
+        return dset
     return input_fn
 
 #----------------------------------------------------------------------------
@@ -264,7 +298,7 @@ def training_loop(
     #dset, input_fn = get_input_fn(training_set, num_gpus*32)
     def load_training_set(**kws):
         return dataset.load_dataset(data_dir=dnnlib.convert_path(data_dir), verbose=True, **dataset_args, **kws)
-    input_fn = get_input_fn(load_training_set)
+    input_fn = get_input_fn(load_training_set, num_gpus)
 
     def model_fn(features, labels, mode, params):
         nonlocal G_opt_args, D_opt_args, G_reg_interval, D_reg_interval, lazy_regularization, G_smoothing_kimg
