@@ -180,9 +180,10 @@ def get_input_fn(load_training_set, num_cores):
                 parsed_features = tf.parse_single_example(example_proto, features)
                 return parsed_features["text"], parsed_features["text"].dense_shape[0]
 
-            _tf_labels_var, _tf_labels_init = tflib.create_var_with_large_initial_value2(training_set._np_labels, name='labels_var')
-            with tf.control_dependencies([_tf_labels_init]):
-                _tf_labels_dataset = tf.data.Dataset.from_tensor_slices(_tf_labels_var)
+            #_tf_labels_var, _tf_labels_init = tflib.create_var_with_large_initial_value2(training_set._np_labels, name='labels_var', trainable=False)
+            #with tf.control_dependencies([_tf_labels_init]):
+            #    _tf_labels_dataset = tf.data.Dataset.from_tensor_slices(_tf_labels_var)
+            _tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._np_labels)
             dset = dset.map(dataset.TFRecordDataset.parse_tfrecord_tf, num_parallel_calls=2)
             dset = tf.data.Dataset.zip((dset, _tf_labels_dataset))
 
