@@ -337,7 +337,7 @@ class Network:
             with tflex.network_lock:
                 self.ensure()
                 net.ensure()
-            net.copy_vars_from(self)
+                net.copy_vars_from(self)
         return net, finalize
 
     def copy_own_vars_from(self, src_net: "Network") -> None:
