@@ -309,10 +309,10 @@ def training_loop(
         D_loss_op = tf.reduce_mean(D_loss)
         G_opt.register_gradients(G_loss_op, G_gpu.trainables)
         D_opt.register_gradients(D_loss_op, D_gpu.trainables)
-        G_train_op = G_opt._shared_optimizers[''].minimize(G_loss)
-        D_train_op = D_opt._shared_optimizers[''].minimize(D_loss)
-        G_reg_train_op = G_reg_opt._shared_optimizers[''].minimize(G_reg_loss) if G_reg_loss is not None else tf.no_op()
-        D_reg_train_op = G_reg_opt._shared_optimizers[''].minimize(D_reg_loss) if D_reg_loss is not None else tf.no_op()
+        G_train_op = G_opt._shared_optimizers[''].minimize(G_loss, var_list=G_gpu.trainables)
+        D_train_op = D_opt._shared_optimizers[''].minimize(D_loss, var_list=D_gpu.trainables)
+        G_reg_train_op = G_reg_opt._shared_optimizers[''].minimize(G_reg_loss, var_list=G_gpu.trainables) if G_reg_loss is not None else tf.no_op()
+        D_reg_train_op = G_reg_opt._shared_optimizers[''].minimize(D_reg_loss, var_list=D_gpu.trainables) if D_reg_loss is not None else tf.no_op()
         loss = G_loss_op + D_loss_op
         if G_reg_loss is not None: loss += G_reg_loss
         if D_reg_loss is not None: loss += D_reg_loss
