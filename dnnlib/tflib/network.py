@@ -14,6 +14,8 @@ import sys
 import numpy as np
 import tensorflow as tf
 import tflex
+import threading
+tflex.network_lock = threading.RLock()
 
 from collections import OrderedDict
 from typing import Any, List, Tuple, Union
@@ -134,6 +136,10 @@ class Network:
         self._need_reset = True
 
     def _init_graph(self) -> None:
+        with tflex.network_lock:
+            self._init_graph_()
+
+    def _init_graph_(self) -> None:
         # Collect inputs.
         self.input_names = []
 
@@ -148,9 +154,8 @@ class Network:
         if self.name is None:
             self.name = self._build_func_name
         assert re.match("^[A-Za-z0-9_.\\-]*$", self.name)
-        with tflex.lock:
-            with tf.name_scope(None):
-                self.scope = tf.get_default_graph().unique_name(self.name, mark_as_used=True)
+        with tf.name_scope(None):
+            self.scope = tf.get_default_graph().unique_name(self.name, mark_as_used=True)
 
         # Finalize build func kwargs.
         build_kwargs = dict(self.static_kwargs)
@@ -158,13 +163,12 @@ class Network:
         build_kwargs["components"] = self.components
 
         # Build template graph.
-        with tflex.lock:
-            with tfutil.absolute_variable_scope(self.scope, reuse=False), tfutil.absolute_name_scope(self.scope):  # ignore surrounding scopes
-                assert tf.get_variable_scope().name == self.scope
-                assert tf.get_default_graph().get_name_scope() == self.scope
-                with tf.control_dependencies(None):  # ignore surrounding control dependencies
-                    self.input_templates = [tf.placeholder(tf.float32, name=name) for name in self.input_names]
-                    out_expr = self._build_func(*self.input_templates, **build_kwargs)
+        with tfutil.absolute_variable_scope(self.scope, reuse=False), tfutil.absolute_name_scope(self.scope):  # ignore surrounding scopes
+            assert tf.get_variable_scope().name == self.scope
+            assert tf.get_default_graph().get_name_scope() == self.scope
+            with tf.control_dependencies(None):  # ignore surrounding control dependencies
+                self.input_templates = [tf.placeholder(tf.float32, name=name) for name in self.input_names]
+                out_expr = self._build_func(*self.input_templates, **build_kwargs)
 
         # Collect outputs.
         assert tfutil.is_tf_expression(out_expr) or isinstance(out_expr, tuple)
