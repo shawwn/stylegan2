@@ -95,6 +95,7 @@ class Optimizer:
         loss_scaling_inc:       float           = 0.0005,                   # Log2 of per-minibatch loss scaling increment when there is no overflow.
         loss_scaling_dec:       float           = 1.0,                      # Log2 of per-minibatch loss scaling decrement when there is an overflow.
         report_mem_usage:       bool            = False,                    # Report fine-grained memory usage statistics in TensorBoard?
+        cross_shard:            bool            = False,                    # Use CrossShardOptimizer?
         **kwargs):
 
         # Public fields.
@@ -116,6 +117,7 @@ class Optimizer:
         self._shared_optimizers     = OrderedDict() # device_name => optimizer_class
         self._gradient_shapes       = None          # [shape, ...]
         self._report_mem_usage      = report_mem_usage
+        self._cross_shard           = cross_shard
 
         # Validate arguments.
         assert callable(self.optimizer_class)
@@ -150,6 +152,9 @@ class Optimizer:
             if device_name not in self._shared_optimizers:
                 optimizer_name = self.scope.replace("/", "_") + "_opt%d" % len(self._shared_optimizers)
                 self._shared_optimizers[device_name] = self.optimizer_class(name=optimizer_name, learning_rate=self.learning_rate, **self.optimizer_kwargs)
+                if self._cross_shard or 'TPU_REPLICATED_CORE' in device_name:
+                    print('Using cross-shard optimizer for %s' % device_name)
+                    self._shared_optimizers[device_name] = tf.contrib.tpu.CrossShardOptimizer(self._shared_optimizers[device_name])
             device.optimizer = self._shared_optimizers[device_name]
             if self.use_loss_scaling:
                 device.loss_scaling_var = tf.Variable(np.float32(self.loss_scaling_init), trainable=False, name="loss_scaling_var")

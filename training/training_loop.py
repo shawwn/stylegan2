@@ -9,6 +9,7 @@
 import os
 import numpy as np
 import tensorflow as tf
+from tensorflow.contrib import tpu
 import tflex
 import tqdm
 import time

@@ -930,6 +930,9 @@ def get_override_cores(session=None):
   if hasattr(session, '_override_cores'):
     return session._override_cores
 
+def device_for_tpu_core(task=0, core=0, job_name="tpu_worker"):
+  return "/job:%s/task:%d/device:TPU_REPLICATED_CORE:%d" % (job_name, task, core)
+
 def device(name=''):
   if has_override_device():
     return nullcontext()
@@ -939,6 +942,9 @@ def device(name=''):
     if name.startswith('/gpu:'):
       i = int(name.split(':', 1)[-1])
       return tf.device(get_cores()[i].name)
+    if name.startswith('/tpu:'):
+      i = int(name.split(':', 1)[-1])
+      return tf.device(device_for_tpu_core(core=i))
     if name.startswith('/cpu:'):
       i = int(name.split(':', 1)[-1])
       return tf.device(get_cpus()[i].name)
