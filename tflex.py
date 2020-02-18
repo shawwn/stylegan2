@@ -81,6 +81,8 @@ class Future(object):
     if isinstance(dependencies, Future):
       dependencies = [dependencies]
     self.dependencies = [defer(_) if callable(_) else _ for _ in dependencies]
+    if thunk is None:
+      thunk = lambda: None
     self.thunk = thunk
     self.args = args
     self.kws = kws

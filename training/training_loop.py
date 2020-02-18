@@ -245,18 +245,16 @@ def training_loop(
         with tflex.lock:
             me.G = G_gpu
             me.D = D_gpu
-            me.G_final = G_final
-            me.D_final = D_final
+            me.G_final = tflex.defer(G_final)
+            me.D_final = tflex.defer(D_final)
     print('Making generators...')
     tflex.parallelize_verbose("Generator", range(num_gpus), make_generator, synchronous=True)
-    print('Cloning shadows...')
+    print('Finalizing clones...')
     def make_shadow(gpu):
         me = get_shard(gpu)
-        if callable(me.G_final):
-            me.G_final()
-        if callable(me.D_final):
-            me.D_final()
-    tflex.parallelize_verbose("Shadow", range(num_gpus), make_shadow, synchronous=False)
+        me.G_final.join()
+        me.D_final.join()
+    tflex.parallelize_verbose("Finalize clone", range(num_gpus), make_shadow, synchronous=False)
 
     def make_shard(gpu):
         nonlocal data_fetch_ops
