@@ -424,7 +424,7 @@ def training_loop(
 
     use_tpu = True
     training_steps = 2048*20480
-    batch_size = num_gpus
+    batch_size = sched_args.minibatch_size_base
     model_dir=os.environ['MODEL_DIR'] if 'MODEL_DIR' in os.environ else 'gs://danbooru-euw4a/test/run30/'
     #if tf.gfile.Exists(model_dir):
     #  tf.gfile.DeleteRecursively(model_dir)
