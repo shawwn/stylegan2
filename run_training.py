@@ -55,8 +55,6 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
     sched.G_lrate_base = sched.D_lrate_base = 0.002
     sched.minibatch_size_base = num_gpus
     sched.minibatch_gpu_base = 1
-    sched.G_lrate_base *= (sched.minibatch_size_base / 32.0)
-    sched.D_lrate_base *= (sched.minibatch_size_base / 32.0)
     D_loss.gamma = 10
     metrics = [metric_defaults[x] for x in metrics]
     desc = 'stylegan2'
