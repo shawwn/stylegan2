@@ -435,7 +435,7 @@ def training_loop(
         model_dir=model_dir,
         #save_checkpoints_steps=100,
         save_checkpoints_secs=600//5,
-        keep_checkpoint_max=5*5,
+        keep_checkpoint_max=10,
         keep_checkpoint_every_n_hours=2,
         cluster=tpu_cluster_resolver,
         tpu_config=tf.contrib.tpu.TPUConfig(iterations_per_loop=256))
