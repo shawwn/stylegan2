@@ -325,8 +325,9 @@ def training_loop(
         minibatch_gpu_in = params['batch_size']
         G_opt_args = dict(G_opt_args)
         D_opt_args = dict(D_opt_args)
-        G_opt = tflib.Optimizer(name='TrainG', cross_shard=True, **G_opt_args)
-        D_opt = tflib.Optimizer(name='TrainD', cross_shard=True, **D_opt_args)
+        sched_args = dict(sched_args)
+        G_opt = tflib.Optimizer(name='TrainG', cross_shard=True, learning_rate=sched_args['G_lrate_base'], **G_opt_args)
+        D_opt = tflib.Optimizer(name='TrainD', cross_shard=True, learning_rate=sched_args['D_lrate_base'], **D_opt_args)
         #import pdb; pdb.set_trace()
         with tf.name_scope('G_loss'):
             G_loss, G_reg = dnnlib.util.call_func_by_name(G=G_gpu, D=D_gpu, opt=G_opt, training_set=training_set,
@@ -342,8 +343,8 @@ def training_loop(
         #D_reg_interval = tf.constant(D_reg_interval, tf.int64)
         #zero = tf.constant(0, tf.int64)
         #one = tf.constant(1, tf.int64)
-        G_reg_opt = tflib.Optimizer(name='RegG', share=G_opt, cross_shard=True, **G_opt_args)
-        D_reg_opt = tflib.Optimizer(name='RegD', share=D_opt, cross_shard=True, **D_opt_args)
+        G_reg_opt = tflib.Optimizer(name='RegG', share=G_opt, cross_shard=True, learning_rate=sched_args['G_lrate_base'], **G_opt_args)
+        D_reg_opt = tflib.Optimizer(name='RegD', share=D_opt, cross_shard=True, learning_rate=sched_args['D_lrate_base'], **D_opt_args)
         if not lazy_regularization:
             G_reg_loss = None
             D_reg_loss = None
