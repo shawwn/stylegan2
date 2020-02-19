@@ -87,7 +87,7 @@ class Optimizer:
     def __init__(self,
         name:                   str             = "Train",                  # Name string that will appear in TensorFlow graph.
         tf_optimizer:           str             = "tf.train.AdamOptimizer", # Underlying optimizer class.
-        learning_rate:          TfExpressionEx  = 0.001,                    # Learning rate. Can vary over time.
+        learning_rate:          TfExpressionEx  = 0.002,                    # Learning rate. Can vary over time.
         minibatch_multiplier:   TfExpressionEx  = None,                     # Treat N consecutive minibatches as one by accumulating gradients.
         share:                  "Optimizer"     = None,                     # Share internal state with a previously created optimizer?
         use_loss_scaling:       bool            = False,                    # Enable dynamic loss scaling for robust mixed-precision training?
