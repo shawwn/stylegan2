@@ -21,6 +21,7 @@ from dnnlib.tflib.autosummary import autosummary
 from training import dataset
 from training import misc
 from metrics import metric_base
+from pprint import pprint
 
 #----------------------------------------------------------------------------
 # Just-in-time processing of training images before feeding them to the networks.
@@ -425,6 +426,7 @@ def training_loop(
     use_tpu = True
     training_steps = 2048*20480
     batch_size = sched_args.minibatch_size_base
+    pprint(sched_args)
     model_dir=os.environ['MODEL_DIR'] if 'MODEL_DIR' in os.environ else 'gs://danbooru-euw4a/test/run30/'
     #if tf.gfile.Exists(model_dir):
     #  tf.gfile.DeleteRecursively(model_dir)
