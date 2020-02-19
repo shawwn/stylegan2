@@ -360,7 +360,7 @@ def training_loop(
         D_loss_op = tf.reduce_mean(D_loss)
         G_opt.register_gradients(G_loss_op, G_gpu.trainables)
         D_opt.register_gradients(D_loss_op, D_gpu.trainables)
-        inc_global_step = tf.assign_add(tf.train.get_or_create_global_step(), 1, name="inc_global_step")
+        inc_global_step = tf.assign_add(tf.train.get_or_create_global_step(), minibatch_gpu_in, name="inc_global_step")
         G_train_op = G_opt._shared_optimizers[''].minimize(G_loss, var_list=G_gpu.trainables)
         D_train_op = D_opt._shared_optimizers[''].minimize(D_loss, var_list=D_gpu.trainables)
         if lazy_regularization:
