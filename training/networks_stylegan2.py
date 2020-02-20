@@ -152,6 +152,8 @@ def minibatch_stddev_layer(x, group_size=4, num_new_features=1):
 # Composed of two sub-networks (mapping and synthesis) that are defined below.
 # Used in configs B-F (Table 1).
 
+from training import ganlib
+
 def G_main(
     latents_in,                                         # First input: Latent vectors (Z) [minibatch, latent_size].
     labels_in,                                          # Second input: Conditioning labels [minibatch, label_size].
@@ -192,6 +194,15 @@ def G_main(
     dlatent_size = components.synthesis.input_shape[2]
     if 'mapping' not in components:
         components.mapping = tflib.Network('G_mapping', func_name=globals()[mapping_func], dlatent_broadcast=num_layers, **kwargs)
+
+    if 'perceptual' not in components:
+        #import pdb; pdb.set_trace()
+        #components.perceptual = ganlib.load_perceptual()
+        from training.vgg16_zhang_perceptual import lpips_network
+        _P = dnnlib.EasyDict()
+        _P.name = 'vgg16_perceptual_distance'
+        _P.static_kwargs = {}
+        components.perceptual = tflib.Network(_P.name, lpips_network, **_P.static_kwargs)
 
     # Setup variables.
     lod_in = tf.get_variable('lod', initializer=np.float32(0), trainable=False, use_resource=True)

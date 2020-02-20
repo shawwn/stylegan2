@@ -42,7 +42,7 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
     G_opt     = EasyDict(beta1=0.0, beta2=0.99, epsilon=1e-8)                  # Options for generator optimizer.
     D_opt     = EasyDict(beta1=0.0, beta2=0.99, epsilon=1e-8)                  # Options for discriminator optimizer.
     G_loss    = EasyDict(func_name='training.loss.G_logistic_ns_pathreg')      # Options for generator loss.
-    D_loss    = EasyDict(func_name='training.loss.D_logistic_r1')              # Options for discriminator loss.
+    D_loss    = EasyDict(func_name='training.loss.D_vgg')                      # Options for discriminator loss.
     sched     = EasyDict()                                                     # Options for TrainingSchedule.
     grid      = EasyDict(size='8k', layout='random')                           # Options for setup_snapshot_image_grid().
     sc        = dnnlib.SubmitConfig()                                          # Options for dnnlib.submit_run().
@@ -71,7 +71,7 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
     desc += '-' + config_id
 
     # Configs A-E: Shrink networks to match original StyleGAN.
-    if config_id != 'config-f':
+    if not config_id.startswith('config-f'):
         G.fmap_base = D.fmap_base = 8 << 10
 
     # Config E: Set gamma to 100 and override G & D architecture.

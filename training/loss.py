@@ -11,6 +11,17 @@ import tensorflow as tf
 import dnnlib.tflib as tflib
 from dnnlib.tflib.autosummary import autosummary
 
+from training import misc
+
+from training import vgg16_zhang_perceptual
+
+lpips = None
+def get_lpips():
+    global lpips
+    if lpips is None:
+        lpips = misc.load_pkl('https://drive.google.com/uc?id=1N2-m9qszOeVC9Tq77WxsLnuWwOedQiD2', 'vgg16_zhang_perceptual.pkl')
+    return lpips
+
 #----------------------------------------------------------------------------
 # Logistic loss from the paper
 # "Generative Adversarial Nets", Goodfellow et al. 2014
@@ -31,6 +42,27 @@ def G_logistic_ns(G, D, opt, training_set, minibatch_size):
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
     fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
     loss = tf.nn.softplus(-fake_scores_out) # -log(sigmoid(fake_scores_out))
+    return loss, None
+
+def D_vgg(G, D, opt, training_set, minibatch_size, reals, labels, gamma=10.0):
+    _ = opt, training_set
+    latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
+    fake_images_out = G.get_output_for(latents, labels, is_training=True)
+    #real_scores_out = D.get_output_for(reals, labels, is_training=True)
+    #fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
+    #real_scores_out = autosummary('Loss/scores/real', real_scores_out)
+    #fake_scores_out = autosummary('Loss/scores/fake', fake_scores_out)
+    #loss = tf.nn.softplus(fake_scores_out) # -log(1-sigmoid(fake_scores_out))
+    #loss += tf.nn.softplus(-real_scores_out) # -log(sigmoid(real_scores_out)) # pylint: disable=invalid-unary-operand-type
+
+    # Loss graph.
+    #self._target_images_var = tf.Variable(tf.zeros(proc_images_expr.shape), name='target_images_var')
+    #import pdb; pdb.set_trace()
+    #pips = get_lpips()
+    pips = G.components.perceptual
+    dist = pips.get_output_for(reals, fake_images_out, is_training=True)
+    loss = tf.reduce_sum(dist)
+
     return loss, None
 
 def D_logistic(G, D, opt, training_set, minibatch_size, reals, labels):

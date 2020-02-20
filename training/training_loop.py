@@ -20,6 +20,7 @@ from dnnlib.tflib.autosummary import autosummary
 
 from training import dataset
 from training import misc
+from training import async_checkpoint
 from metrics import metric_base
 from pprint import pprint
 
@@ -362,7 +363,8 @@ def training_loop(
         D_opt.register_gradients(D_loss_op, D_gpu.trainables)
         inc_global_step = tf.assign_add(tf.train.get_or_create_global_step(), minibatch_gpu_in, name="inc_global_step")
         G_train_op = G_opt._shared_optimizers[''].minimize(G_loss, var_list=G_gpu.trainables)
-        D_train_op = D_opt._shared_optimizers[''].minimize(D_loss, var_list=D_gpu.trainables)
+        #D_train_op = D_opt._shared_optimizers[''].minimize(D_loss, var_list=G_gpu.components.perceptual.trainables)
+        D_train_op = D_opt._shared_optimizers[''].minimize(D_loss, var_list=G_gpu.trainables)
         if lazy_regularization:
             if False:
                 G_reg_train_op = tf.cond(
@@ -427,10 +429,15 @@ def training_loop(
     training_steps = 2048*20480
     batch_size = sched_args.minibatch_size_base
     pprint(sched_args)
-    model_dir=os.environ['MODEL_DIR'] if 'MODEL_DIR' in os.environ else 'gs://danbooru-euw4a/test/run30/'
-    #if tf.gfile.Exists(model_dir):
-    #  tf.gfile.DeleteRecursively(model_dir)
+    model_dir=os.environ['MODEL_DIR'] if 'MODEL_DIR' in os.environ else 'gs://danbooru-euw4a/test/run31/'
+    if 'DELETE_MODEL_DIR' in os.environ:
+        print('deleting model dir %s...' % model_dir)
+        time.sleep(5.0)
+        if tf.gfile.Exists(model_dir):
+            tf.gfile.DeleteRecursively(model_dir)
     tpu_cluster_resolver = tflex.get_tpu_resolver()
+    iterations_per_loop=256
+    save_iterations=100
     run_config = tf.contrib.tpu.RunConfig(
         model_dir=model_dir,
         #save_checkpoints_steps=100,
@@ -438,7 +445,7 @@ def training_loop(
         keep_checkpoint_max=10,
         keep_checkpoint_every_n_hours=2,
         cluster=tpu_cluster_resolver,
-        tpu_config=tf.contrib.tpu.TPUConfig(iterations_per_loop=256))
+        tpu_config=tf.contrib.tpu.TPUConfig(iterations_per_loop=iterations_per_loop))
     estimator = tf.contrib.tpu.TPUEstimator(
         config=run_config,
         use_tpu=use_tpu,
@@ -446,8 +453,16 @@ def training_loop(
         train_batch_size=batch_size)
     #import pdb; pdb.set_trace()
     print('Training...')
-    estimator.train(input_fn, steps=training_steps)
+    hooks = []
+    hooks.append(async_checkpoint.VGGRestoreHook())
+    if False:
+        hooks.append(
+            async_checkpoint.AsyncCheckpointSaverHook(
+                checkpoint_dir=model_dir,
+                save_steps=max(100, iterations_per_loop)))
+    estimator.train(input_fn, steps=training_steps, hooks=hooks)
     import pdb; pdb.set_trace()
+
 
     grid_size, grid_reals, grid_labels = misc.setup_snapshot_image_grid(training_set, **grid_args)
     misc.save_image_grid(grid_reals, dnnlib.make_run_dir_path('reals.png'), drange=training_set.dynamic_range, grid_size=grid_size)

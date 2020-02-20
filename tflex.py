@@ -327,6 +327,9 @@ class Session(tf.Session):
       cluster_spec = resolver.cluster_spec()
       if cluster_spec:
         config.cluster_def.CopyFrom(cluster_spec.as_cluster_def())
+    else:
+      if target == 'auto':
+        target = None
     super().__init__(target, graph=graph, config=config)
     self.id = id
     self._tflex_resolver = resolver
@@ -366,7 +369,7 @@ class Session(tf.Session):
     return result
 
 
-def split_by_params(vs, n=20e6, f=None):
+def split_by_params(vs, n=2e6, f=None):
   if f is None:
     f = lambda x: np.prod(x.shape.as_list())
   i = 0
