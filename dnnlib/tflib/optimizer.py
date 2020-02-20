@@ -173,7 +173,7 @@ class Optimizer:
         # Validate trainables.
         if isinstance(trainable_vars, dict):
             trainable_vars = list(trainable_vars.values())  # allow passing in Network.trainables as vars
-        assert isinstance(trainable_vars, list) and len(trainable_vars) >= 1
+        assert isinstance(trainable_vars, list) #and len(trainable_vars) >= 1
         assert all(tfutil.is_tf_expression(expr) for expr in trainable_vars + [loss])
         assert all(var.device == device.name for var in trainable_vars)
 
@@ -197,7 +197,7 @@ class Optimizer:
         with tf.name_scope(self.id + "_grad"), tflex.device(device.name), tf.control_dependencies(deps):
             loss = self.apply_loss_scaling(tf.cast(loss, tf.float32))
             gate = tf.train.Optimizer.GATE_NONE  # disable gating to reduce memory usage
-            grad_list = device.optimizer.compute_gradients(loss=loss, var_list=trainable_vars, gate_gradients=gate)
+            grad_list = [] if len(trainable_vars) <= 0 else device.optimizer.compute_gradients(loss=loss, var_list=trainable_vars, gate_gradients=gate)
 
         # Register gradients.
         for grad, var in grad_list:

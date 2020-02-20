@@ -48,7 +48,7 @@ class VGGRestoreHook(session_run_hook.SessionRunHook):
     var_list = [x for x in tf.global_variables() if 'vgg16_' in x.name and not '_opt' in x.name]
     saver = tflex.Saver(var_list=var_list)
     pp(var_list)
-    saver.restore(session, 'test/vgg')
+    saver.restore(session, 'test/vgg', ignore_missing=True)
     #global_step = session.run(self._global_step_tensor)
     #if self._last_step is None:
     #  self._last_step = global_step + self._num_steps

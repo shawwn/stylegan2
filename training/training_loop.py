@@ -318,10 +318,14 @@ def training_loop(
         resolution = features.shape[2].value
         label_size = labels.shape[1].value
         G = tflib.Network('G', num_channels=num_channels, resolution=resolution, label_size=label_size, **G_args)
-        D = tflib.Network('D', num_channels=num_channels, resolution=resolution, label_size=label_size, **D_args)
+        #D = tflib.Network('D', num_channels=num_channels, resolution=resolution, label_size=label_size, **D_args)
+        D = None
+
         Gs, Gs_finalize = G.clone2('Gs')
         G_gpu = G
         D_gpu = D
+        G_var = G_gpu.trainables if G_gpu else []
+        D_var = D_gpu.trainables if D_gpu else []
         reals_read = features
         labels_read = labels
         minibatch_gpu_in = params['batch_size']
@@ -333,7 +337,8 @@ def training_loop(
         #import pdb; pdb.set_trace()
         with tf.name_scope('G_loss'):
             G_loss, G_reg = dnnlib.util.call_func_by_name(G=G_gpu, D=D_gpu, opt=G_opt, training_set=training_set,
-                                                          minibatch_size=minibatch_gpu_in, **G_loss_args)
+                                                          minibatch_size=minibatch_gpu_in, reals=reals_read,
+                                                          labels=labels_read, **G_loss_args)
         with tf.name_scope('D_loss'):
             D_loss, D_reg = dnnlib.util.call_func_by_name(G=G_gpu, D=D_gpu, opt=D_opt, training_set=training_set,
                                                           minibatch_size=minibatch_gpu_in, reals=reals_read,
@@ -355,36 +360,37 @@ def training_loop(
         else:
             if G_reg is not None: G_reg_loss = tf.reduce_mean(G_reg * G_reg_interval)
             if D_reg is not None: D_reg_loss = tf.reduce_mean(D_reg * D_reg_interval)
-            if G_reg is not None: G_reg_opt.register_gradients(G_reg_loss, G_gpu.trainables)
-            if D_reg is not None: D_reg_opt.register_gradients(D_reg_loss, D_gpu.trainables)
+            if G_reg is not None: G_reg_opt.register_gradients(G_reg_loss, G_var)
+            if D_reg is not None: D_reg_opt.register_gradients(D_reg_loss, D_var)
         G_loss_op = tf.reduce_mean(G_loss)
         D_loss_op = tf.reduce_mean(D_loss)
-        G_opt.register_gradients(G_loss_op, G_gpu.trainables)
-        D_opt.register_gradients(D_loss_op, D_gpu.trainables)
+        G_opt.register_gradients(G_loss_op, G_var)
+        D_opt.register_gradients(D_loss_op, D_var)
         inc_global_step = tf.assign_add(tf.train.get_or_create_global_step(), minibatch_gpu_in, name="inc_global_step")
-        G_train_op = G_opt._shared_optimizers[''].minimize(G_loss, var_list=G_gpu.trainables)
+        G_train_op = G_opt._shared_optimizers[''].minimize(G_loss, var_list=G_var)
         #D_train_op = D_opt._shared_optimizers[''].minimize(D_loss, var_list=G_gpu.components.perceptual.trainables)
-        D_train_op = D_opt._shared_optimizers[''].minimize(D_loss, var_list=G_gpu.trainables)
+        #D_train_op = D_opt._shared_optimizers[''].minimize(D_loss, var_list=G_var)
+        D_train_op = tf.no_op()
         if lazy_regularization:
             if False:
                 G_reg_train_op = tf.cond(
                     lambda: tf.cast(tf.mod(tf.train.get_global_step(), G_reg_interval), tf.bool),
-                    lambda: G_reg_opt._shared_optimizers[''].minimize(G_reg_loss, var_list=G_gpu.trainables),
+                    lambda: G_reg_opt._shared_optimizers[''].minimize(G_reg_loss, var_list=G_var),
                     lambda: tf.no_op()) if G_reg_loss is not None else tf.no_op()
                 D_reg_train_op = tf.cond(
                     lambda: tf.cast(tf.mod(tf.train.get_global_step(), D_reg_interval), tf.bool),
-                    lambda: D_reg_opt._shared_optimizers[''].minimize(D_reg_loss, var_list=D_gpu.trainables),
+                    lambda: D_reg_opt._shared_optimizers[''].minimize(D_reg_loss, var_list=D_var),
                     lambda: tf.no_op()) if D_reg_loss is not None else tf.no_op()
             else:
                 assert (G_reg is not None)
                 assert (D_reg is not None)
                 def G_fn():
                     with tf.control_dependencies([tf.train.get_or_create_global_step()]):
-                        G_op = G_reg_opt._shared_optimizers[''].minimize(G_reg_loss, var_list=G_gpu.trainables)
+                        G_op = G_reg_opt._shared_optimizers[''].minimize(G_reg_loss, var_list=G_var)
                         return G_op
                 def D_fn():
                     with tf.control_dependencies([tf.train.get_or_create_global_step()]):
-                        D_op = D_reg_opt._shared_optimizers[''].minimize(D_reg_loss, var_list=D_gpu.trainables)
+                        D_op = D_reg_opt._shared_optimizers[''].minimize(D_reg_loss, var_list=D_var)
                         return D_op
                 def G_else():
                     with tf.control_dependencies([tf.train.get_or_create_global_step()]):
@@ -397,8 +403,8 @@ def training_loop(
                 G_reg_train_op = tf.cond(lambda: tf.equal(tf.mod(tf.train.get_or_create_global_step(), G_reg_interval), tf.constant(0, tf.int64)), G_fn, G_else)
                 D_reg_train_op = tf.cond(lambda: tf.equal(tf.mod(tf.train.get_or_create_global_step(), D_reg_interval), tf.constant(0, tf.int64)), D_fn, D_else)
         else:
-            G_reg_train_op = G_reg_opt._shared_optimizers[''].minimize(G_reg_loss, var_list=G_gpu.trainables) if G_reg_loss is not None else tf.no_op()
-            D_reg_train_op = D_reg_opt._shared_optimizers[''].minimize(D_reg_loss, var_list=D_gpu.trainables) if D_reg_loss is not None else tf.no_op()
+            G_reg_train_op = G_reg_opt._shared_optimizers[''].minimize(G_reg_loss, var_list=G_var) if G_reg_loss is not None else tf.no_op()
+            D_reg_train_op = D_reg_opt._shared_optimizers[''].minimize(D_reg_loss, var_list=D_var) if D_reg_loss is not None else tf.no_op()
 
         #run_G_reg = (lazy_regularization and running_mb_counter % G_reg_interval == 0)
         #run_D_reg = (lazy_regularization and running_mb_counter % D_reg_interval == 0)

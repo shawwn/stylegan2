@@ -194,15 +194,9 @@ def G_main(
     dlatent_size = components.synthesis.input_shape[2]
     if 'mapping' not in components:
         components.mapping = tflib.Network('G_mapping', func_name=globals()[mapping_func], dlatent_broadcast=num_layers, **kwargs)
-
     if 'perceptual' not in components:
-        #import pdb; pdb.set_trace()
-        #components.perceptual = ganlib.load_perceptual()
         from training.vgg16_zhang_perceptual import lpips_network
-        _P = dnnlib.EasyDict()
-        _P.name = 'vgg16_perceptual_distance'
-        _P.static_kwargs = {}
-        components.perceptual = tflib.Network(_P.name, lpips_network, **_P.static_kwargs)
+        components.perceptual = tflib.Network('vgg16_perceptual_distance', lpips_network)
 
     # Setup variables.
     lod_in = tf.get_variable('lod', initializer=np.float32(0), trainable=False, use_resource=True)
@@ -708,6 +702,56 @@ def D_stylegan2(
         x = apply_bias_act(dense_layer(x, fmaps=max(labels_in.shape[1], 1)))
         if labels_in.shape[1] > 0:
             x = tf.reduce_sum(x * labels_in, axis=1, keepdims=True)
+    scores_out = x
+
+    # Output.
+    assert scores_out.dtype == tf.as_dtype(dtype)
+    scores_out = tf.identity(scores_out, name='scores_out')
+    return scores_out
+
+#----------------------------------------------------------------------------
+# nogan
+
+def D_nogan(
+        images_in,                          # First input: Images [minibatch, channel, height, width].
+        labels_in,                          # Second input: Labels [minibatch, label_size].
+        num_channels        = 3,            # Number of input color channels. Overridden based on dataset.
+        resolution          = 1024,         # Input resolution. Overridden based on dataset.
+        label_size          = 0,            # Dimensionality of the labels, 0 if no labels. Overridden based on dataset.
+        fmap_base           = 16 << 10,     # Overall multiplier for the number of feature maps.
+        fmap_decay          = 1.0,          # log2 feature map reduction when doubling the resolution.
+        fmap_min            = 1,            # Minimum number of feature maps in any layer.
+        fmap_max            = 512,          # Maximum number of feature maps in any layer.
+        architecture        = 'resnet',     # Architecture: 'orig', 'skip', 'resnet'.
+        nonlinearity        = 'lrelu',      # Activation function: 'relu', 'lrelu', etc.
+        mbstd_group_size    = 4,            # Group size for the minibatch standard deviation layer, 0 = disable.
+        mbstd_num_features  = 1,            # Number of features for the minibatch standard deviation layer.
+        dtype               = 'float32',    # Data type to use for activations and outputs.
+        resample_kernel     = [1,3,3,1],    # Low-pass filter to apply when resampling activations. None = no filtering.
+        components=dnnlib.EasyDict(),       # Container for sub-networks. Retained between calls.
+        **_kwargs):                         # Ignore unrecognized keyword args.
+
+    resolution_log2 = int(np.log2(resolution))
+    assert resolution == 2**resolution_log2 and resolution >= 4
+    def nf(stage): return np.clip(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_min, fmap_max)
+    assert architecture in ['orig', 'skip', 'resnet']
+    act = nonlinearity
+
+    images_in.set_shape([None, num_channels, resolution, resolution])
+    #labels_in.set_shape([None, num_channels, resolution, resolution])
+    labels_in.set_shape([None, label_size])
+    images_in = tf.cast(images_in, dtype)
+    labels_in = tf.cast(labels_in, dtype)
+
+    if 'perceptual' not in components:
+        #import pdb; pdb.set_trace()
+        #components.perceptual = ganlib.load_perceptual()
+        from training.vgg16_zhang_perceptual import lpips_network
+        _P = dnnlib.EasyDict()
+        _P.name = 'vgg16_perceptual_distance'
+        _P.static_kwargs = {}
+        components.perceptual = tflib.Network(_P.name, lpips_network, **_P.static_kwargs)
+    x = components.perceptual.get_output_for(images_in, labels_in)
     scores_out = x
 
     # Output.

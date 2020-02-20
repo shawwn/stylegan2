@@ -487,12 +487,25 @@ def load_weights(ckpt, session=None, var_list=None, reshape=False):
         value = truncate_value(variable, value, reshape=reshape)
         variable.load(value, session)
 
-def load_variables(ckpt, session=None, var_list=None, reshape=False):
+def get_values(variables, f, reshape=False, ignore_missing=False):
+  for x in variables:
+    k = variable_name(x)
+    if ignore_missing:
+      try:
+        value = f[k]
+      except KeyError:
+        print('Ignoring missing variable {}'.format(k))
+        continue
+    else:
+      value = f[k]
+    yield truncate_value(x, value, reshape=reshape)
+
+def load_variables(ckpt, session=None, var_list=None, reshape=False, ignore_missing=False):
   session = session or get_default_session()
   vs = var_list or tf.trainable_variables()
   with h5py.File(ckpt, "r") as f:
     for variables in tqdm.tqdm(list(split_by_params(vs))):
-      values = [truncate_value(x, f[variable_name(x)], reshape=reshape)  for x in variables]
+      values = get_values(variables, f, reshape=reshape, ignore_missing=ignore_missing)
       assign_values(variables, values, session=session)
 
 def maketree(path):
@@ -596,15 +609,15 @@ class Saver(object):
     self.filename = filename
     self.checkpoints = []
 
-  def restore(self, sess, save_path):
+  def restore(self, sess, save_path, ignore_missing=False):
     if save_path.endswith('.ckpt'):
       load_snapshot(save_path, session=sess, var_list=self.var_list, reshape=self.reshape)
     elif save_path.endswith('.hdf5'):
-      load_variables(save_path, session=sess, var_list=self.var_list, reshape=self.reshape)
+      load_variables(save_path, session=sess, var_list=self.var_list, reshape=self.reshape, ignore_missing=ignore_missing)
     elif os.path.exists(save_path + '.npy') or os.path.exists(save_path + '-0.npy'):
       load_weights(save_path, session=sess, var_list=self.var_list, reshape=self.reshape)
     elif os.path.exists(save_path + '.hdf5'):
-      load_variables(save_path + '.hdf5', session=sess, var_list=self.var_list, reshape=self.reshape)
+      load_variables(save_path + '.hdf5', session=sess, var_list=self.var_list, reshape=self.reshape, ignore_missing=ignore_missing)
     else:
       raise Exception("Can't load checkpoint %s" % save_path)
 

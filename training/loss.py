@@ -11,17 +11,6 @@ import tensorflow as tf
 import dnnlib.tflib as tflib
 from dnnlib.tflib.autosummary import autosummary
 
-from training import misc
-
-from training import vgg16_zhang_perceptual
-
-lpips = None
-def get_lpips():
-    global lpips
-    if lpips is None:
-        lpips = misc.load_pkl('https://drive.google.com/uc?id=1N2-m9qszOeVC9Tq77WxsLnuWwOedQiD2', 'vgg16_zhang_perceptual.pkl')
-    return lpips
-
 #----------------------------------------------------------------------------
 # Logistic loss from the paper
 # "Generative Adversarial Nets", Goodfellow et al. 2014
@@ -44,7 +33,18 @@ def G_logistic_ns(G, D, opt, training_set, minibatch_size):
     loss = tf.nn.softplus(-fake_scores_out) # -log(sigmoid(fake_scores_out))
     return loss, None
 
+def G_vgg(G, D, opt, training_set, minibatch_size, reals, labels):
+    _ = opt, labels
+    latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
+    labels = training_set.get_random_labels_tf(minibatch_size)
+    fake_images_out = G.get_output_for(latents, labels, is_training=True)
+    fake_scores_out = G.components.perceptual.get_output_for(fake_images_out, reals)
+    loss = tf.reduce_sum(fake_scores_out)
+    return loss, None
+
 def D_vgg(G, D, opt, training_set, minibatch_size, reals, labels, gamma=10.0):
+    _ = G, D, opt, training_set, minibatch_size, reals, labels, gamma
+    return 0.0, None
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
