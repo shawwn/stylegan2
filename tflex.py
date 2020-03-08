@@ -327,6 +327,8 @@ class Session(tf.Session):
       cluster_spec = resolver.cluster_spec()
       if cluster_spec:
         config.cluster_def.CopyFrom(cluster_spec.as_cluster_def())
+    elif target == 'auto':
+      target = None
     super().__init__(target, graph=graph, config=config)
     self.id = id
     self._tflex_resolver = resolver
