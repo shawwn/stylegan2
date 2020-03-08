@@ -63,7 +63,7 @@ def fused_bias_act(x, b=None, axis=1, act='linear', alpha=None, gain=None, impl=
 
     impl_dict = {
         'ref':  _fused_bias_act_ref,
-        'cuda': _fused_bias_act_ref if 'TPU_NAME' in os.environ else _fused_bias_act_cuda,
+        'cuda': _fused_bias_act_ref if 'TPU_NAME' in os.environ or 'NO_NVCC' in os.environ else _fused_bias_act_cuda,
     }
     return impl_dict[impl](x=x, b=b, axis=axis, act=act, alpha=alpha, gain=gain)
 

@@ -57,7 +57,7 @@ def upfirdn_2d(x, k, upx=1, upy=1, downx=1, downy=1, padx0=0, padx1=0, pady0=0, 
 
     impl_dict = {
         'ref':  _upfirdn_2d_ref,
-        'cuda': _upfirdn_2d_ref if 'TPU_NAME' in os.environ else _upfirdn_2d_cuda,
+        'cuda': _upfirdn_2d_ref if 'TPU_NAME' in os.environ or 'NO_NVCC' in os.environ else _upfirdn_2d_cuda,
     }
     return impl_dict[impl](x=x, k=k, upx=upx, upy=upy, downx=downx, downy=downy, padx0=padx0, padx1=padx1, pady0=pady0, pady1=pady1)
 
