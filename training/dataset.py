@@ -65,7 +65,7 @@ class TFRecordDataset:
         tfr_shapes = []
         lod = -1
         for tfr_file in tfr_files:
-          match = re.match('.*([0-9]+).tfrecords', tfr_file)
+          match = re.match('.*?([0-9]+).tfrecords', tfr_file)
           if match:
             level = int(match.group(1))
             res = 2**level
