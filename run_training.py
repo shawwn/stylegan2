@@ -60,7 +60,7 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
     desc = 'stylegan2'
 
     desc += '-' + dataset
-    dataset_args = EasyDict(tfrecord_dir=dataset, resolution=64)
+    dataset_args = EasyDict(tfrecord_dir=dataset, resolution=int(os.environ['RESOLUTION']))
 
     assert num_gpus in [1, 2, 4, 8]
     sc.num_gpus = num_gpus

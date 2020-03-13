@@ -151,7 +151,7 @@ def training_loop(
     # Load training set.
     training_set = dataset.load_dataset(data_dir=dnnlib.convert_path(data_dir), verbose=True, **dataset_args)
     grid_size, grid_reals, grid_labels = misc.setup_snapshot_image_grid(training_set, **grid_args)
-    misc.save_image_grid(grid_reals, dnnlib.make_run_dir_path('reals.png'), drange=training_set.dynamic_range, grid_size=grid_size)
+    #misc.save_image_grid(grid_reals, dnnlib.make_run_dir_path('reals.png'), drange=training_set.dynamic_range, grid_size=grid_size)
 
     # Construct or load networks.
     with tflex.device('/gpu:0'):
@@ -166,12 +166,84 @@ def training_loop(
             if resume_with_new_nets: G.copy_vars_from(rG); D.copy_vars_from(rD); Gs.copy_vars_from(rGs)
             else: G = rG; D = rD; Gs = rGs
 
+    #import pdb; pdb.set_trace()
+    var_list = [v for v in tf.global_variables() if 'Dataset/' not in v.name]
+    saver = tf.train.Saver(var_list=var_list)
+    sess = tf.get_default_session()
+    #ckpt = tf.train.latest_checkpoint('gs://danbooru-euw4a/checkpoint/pug256-1')
+    #saver.restore(sess, ckpt)
+
     # Print layers and generate initial image snapshot.
     G.print_layers(); D.print_layers()
     sched = training_schedule(cur_nimg=total_kimg*1000, training_set=training_set, **sched_args)
-    grid_latents = np.random.randn(np.prod(grid_size), *G.input_shape[1:])
-    grid_fakes = Gs.run(grid_latents, grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu)
-    misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes_init.png'), drange=drange_net, grid_size=grid_size)
+    grid_latents = np.random.randn(np.prod(grid_size), *Gs.input_shape[1:])
+    #grid_latents = grid_latents[0:16]; grid_size = (4, 4)
+    #drange_net = [-2.1, 2.64]
+    model_dir = os.environ['MODEL_DIR']
+    model_dir2 = 'gs://danbooru-euw4a/stylegan2/animefaces128/run1'
+
+    def grab(ckpt):
+      fname = dnnlib.make_run_dir_path(
+        os.path.basename(os.path.dirname(os.path.dirname(ckpt))) + '-' + os.path.basename(
+          os.path.dirname(ckpt)) + '-grid-' + ckpt.split('-')[-1] + '.png')
+      if not os.path.isfile(fname):
+        saver.restore(sess, ckpt)
+        grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu,
+                            randomize_noise=False)
+        misc.save_image_grid(grid_fakes, fname, grid_size=(4, 4), drange=drange_net)
+        print(fname)
+      fname = dnnlib.make_run_dir_path(
+        os.path.basename(os.path.dirname(os.path.dirname(ckpt))) + '-' + os.path.basename(
+          os.path.dirname(ckpt)) + '-fakes-' + ckpt.split('-')[-1] + '.png')
+      if not os.path.isfile(fname):
+        saver.restore(sess, ckpt)
+        grid_fakes = Gs.run(grid_latents, grid_labels, is_validation=True, randomize_noise=False,
+                            minibatch_size=sched.minibatch_gpu)
+        misc.save_image_grid(grid_fakes, fname, drange=drange_net, grid_size=grid_size)
+        print(fname)
+
+    def fetch(model_dir):
+      ckpt = tf.train.latest_checkpoint(model_dir)
+      if ckpt:
+        grab(ckpt)
+      return ckpt
+
+    def forever(*model_dirs):
+      while True:
+        for model_dir in model_dirs:
+          fetch(model_dir)
+        time.sleep(2.0)
+
+    import pdb; pdb.set_trace()
+    forever(model_dir)
+
+    #saver.restore(sess, tf.train.latest_checkpoint(model_dir)); grid_fakes = G.run(0.7 * grid_latents, grid_labels, is_validation=True, randomize_noise=True, minibatch_size=32); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes_init.png'), drange=drange_net, grid_size=grid_size)
+    saver.restore(sess, tf.train.latest_checkpoint(model_dir)); grid_fakes = Gs.run(grid_latents, grid_labels, is_validation=True, randomize_noise=True, minibatch_size=sched.minibatch_gpu); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes_init.png'), drange=drange_net, grid_size=grid_size)
+
+    while True: ckpt = tf.train.latest_checkpoint(model_dir); saver.restore(sess, ckpt); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=False); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('octopus-grid-%s.png' % ckpt.split('-')[-1]), grid_size=(4, 4), drange=drange_net); grid_fakes = Gs.run(grid_latents, grid_labels, is_validation=True, randomize_noise=False, minibatch_size=sched.minibatch_gpu); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('octopus-fakes-%s.png' % ckpt.split('-')[-1]), drange=drange_net, grid_size=grid_size); ckpt2 = tf.train.latest_checkpoint(model_dir2); saver.restore(sess, ckpt2); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=False); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('animefaces-grid-%s.png' % ckpt2.split('-')[-1]), grid_size=(4, 4), drange=drange_net); grid_fakes = Gs.run(grid_latents, grid_labels, is_validation=True, randomize_noise=False, minibatch_size=sched.minibatch_gpu); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('animefaces-fakes-%s.png' % ckpt2.split('-')[-1]), drange=drange_net, grid_size=grid_size); print(ckpt2); print(ckpt2); time.sleep(60.0);
+
+
+    while True: ckpt = tf.train.latest_checkpoint(model_dir); saver.restore(sess, ckpt); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=False); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('octopus-grid-%s.png' % ckpt.split('-')[-1]), grid_size=(4, 4), drange=drange_net); grid_fakes = Gs.run(grid_latents, grid_labels, is_validation=True, randomize_noise=False, minibatch_size=sched.minibatch_gpu); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('octopus-fakes-%s.png' % ckpt.split('-')[-1]), drange=drange_net, grid_size=grid_size); print(ckpt); time.sleep(60.0);
+
+    while True: ckpt = tf.train.latest_checkpoint(model_dir); saver.restore(sess, ckpt); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=False); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('octo256-grid-%s.png' % ckpt.split('-')[-1]), grid_size=(4, 4), drange=drange_net); grid_fakes = Gs.run(grid_latents, grid_labels, is_validation=True, randomize_noise=False, minibatch_size=sched.minibatch_gpu); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('octo256-fakes-%s.png' % ckpt.split('-')[-1]), drange=drange_net, grid_size=grid_size); print(ckpt); time.sleep(60.0);
+
+    while True: ckpt = tf.train.latest_checkpoint(model_dir); saver.restore(sess, ckpt); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=False); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('octo128-grid-%s.png' % ckpt.split('-')[-1]), grid_size=(4, 4), drange=drange_net); grid_fakes = Gs.run(grid_latents, grid_labels, is_validation=True, randomize_noise=False, minibatch_size=sched.minibatch_gpu); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('octo128-fakes-%s.png' % ckpt.split('-')[-1]), drange=drange_net, grid_size=grid_size); print(ckpt); time.sleep(6.0);
+
+    import pdb; pdb.set_trace()
+    # saver.restore(sess, tf.train.latest_checkpoint(model_dir)); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=False); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('Gs_init.png'), grid_size=(4, 4), drange=drange_net)
+    # grid_latents2 = np.random.randn(np.prod(grid_size), *Gs.input_shape[1:]); saver.restore(sess, tf.train.latest_checkpoint(model_dir)); grid_fakes = Gs.run(grid_latents2[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=False); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('Gs2_init.png'), grid_size=(4, 4), drange=drange_net)
+    # saver.restore(sess, tf.train.latest_checkpoint(model_dir)); grid_fakes = G.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=False); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('G_init.png'), grid_size=(4, 4), drange=drange_net)
+    # saver.restore(sess, tf.train.latest_checkpoint(model_dir)); grid_fakes = Gs.run(0.1 * grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=False); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('Gs_trunc.png'), grid_size=(4, 4), drange=drange_net)
+    # saver.restore(sess, tf.train.latest_checkpoint(model_dir)); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=False); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes_init.png'), grid_size=(4, 4), drange=drange_net)
+    # saver.restore(sess, tf.train.latest_checkpoint(model_dir)); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=False); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes_init.png'), grid_size=(4, 4), drange=drange_net)
+    # saver.restore(sess, tf.train.latest_checkpoint(model_dir)); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=True); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes_init.png'), grid_size=(4, 4), drange=drange_net)
+    # saver.restore(sess, tf.train.latest_checkpoint(model_dir)); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=False); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes_init.png'), grid_size=(4, 4), drange=drange_net)
+    # saver.restore(sess, tf.train.latest_checkpoint(model_dir)); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=False); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes_init.png'), grid_size=(4, 4), drange=drange_net)
+    # saver.restore(sess, tf.train.latest_checkpoint(model_dir)); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=True); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes_init.png'), grid_size=(4, 4), drange=drange_net)
+    # saver.restore(sess, tf.train.latest_checkpoint(model_dir)); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=True); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes_init.png'), grid_size=(4, 4), drange=drange_net)
+    # saver.restore(sess, tf.train.latest_checkpoint(model_dir)); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=False); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes_init.png'), grid_size=(4, 4), drange=drange_net)
+    # saver.restore(sess, tf.train.latest_checkpoint(model_dir-1')); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=False); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes_init.png'), grid_size=(4, 4), drange=drange_net)
+    # saver.restore(sess, tf.train.latest_checkpoint(model_dir-1')); grid_fakes = Gs.run(grid_latents[0:16], grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu, randomize_noise=True); misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes_init.png'), grid_size=(4, 4), drange=drange_net)
 
     def save_image_grid(latents, grid_size, filename):
         grid_fakes = Gs.run(latents, grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu)
