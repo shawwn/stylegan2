@@ -37,8 +37,8 @@ def D_logistic(G, D, opt, training_set, minibatch_size, reals, labels):
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
-    real_scores_out = D.get_output_for(reals, labels, is_training=True)
-    fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
+    real_scores_out, real_mode_out = D.get_output_for(reals, labels, is_training=True)
+    fake_scores_out, fake_mode_out = D.get_output_for(fake_images_out, labels, is_training=True)
     real_scores_out = autosummary('Loss/scores/real', real_scores_out)
     fake_scores_out = autosummary('Loss/scores/fake', fake_scores_out)
     loss = tf.nn.softplus(fake_scores_out) # -log(1-sigmoid(fake_scores_out))
@@ -53,8 +53,8 @@ def D_logistic_r1(G, D, opt, training_set, minibatch_size, reals, labels, gamma=
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
-    real_scores_out = D.get_output_for(reals, labels, is_training=True)
-    fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
+    real_scores_out, real_mode_out = D.get_output_for(reals, labels, is_training=True)
+    fake_scores_out, fake_mode_out = D.get_output_for(fake_images_out, labels, is_training=True)
     real_scores_out = autosummary('Loss/scores/real', real_scores_out)
     fake_scores_out = autosummary('Loss/scores/fake', fake_scores_out)
     loss = tf.nn.softplus(fake_scores_out) # -log(1-sigmoid(fake_scores_out))
@@ -71,12 +71,17 @@ def D_logistic_r2(G, D, opt, training_set, minibatch_size, reals, labels, gamma=
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
-    real_scores_out = D.get_output_for(reals, labels, is_training=True)
-    fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
+    real_scores_out, real_mode_out = D.get_output_for(reals, labels, is_training=True)
+    fake_scores_out, fake_mode_out = D.get_output_for(fake_images_out, labels, is_training=True)
     real_scores_out = autosummary('Loss/scores/real', real_scores_out)
     fake_scores_out = autosummary('Loss/scores/fake', fake_scores_out)
     loss = tf.nn.softplus(fake_scores_out) # -log(1-sigmoid(fake_scores_out))
     loss += tf.nn.softplus(-real_scores_out) # -log(sigmoid(real_scores_out)) # pylint: disable=invalid-unary-operand-type
+
+    with tf.name_scope('ModeReg'):
+        label_smoothing = 0.0
+        actual_labels = tf.one_hot(tf.cast(labels, tf.int32), 65536)
+        loss += tf.losses.softmax_cross_entropy(logits=real_mode_out, onehot_labels=actual_labels, label_smoothing=label_smoothing)
 
     with tf.name_scope('GradientPenalty'):
         fake_grads = tf.gradients(tf.reduce_sum(fake_scores_out), [fake_images_out])[0]
@@ -150,8 +155,14 @@ def G_logistic_ns_pathreg(G, D, opt, training_set, minibatch_size, pl_minibatch_
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     labels = training_set.get_random_labels_tf(minibatch_size)
     fake_images_out, fake_dlatents_out = G.get_output_for(latents, labels, is_training=True, return_dlatents=True)
-    fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
+    fake_scores_out, fake_mode_out = D.get_output_for(fake_images_out, labels, is_training=True)
     loss = tf.nn.softplus(-fake_scores_out) # -log(sigmoid(fake_scores_out))
+
+    with tf.name_scope('ModeReg'):
+        label_smoothing = 0.0
+        actual_labels = tf.one_hot(tf.cast(labels, tf.int32), 65536)
+        cross_entropy = tf.losses.softmax_cross_entropy(logits=fake_mode_out, onehot_labels=actual_labels, label_smoothing=label_smoothing)
+        loss += cross_entropy
 
     # Path length regularization.
     with tf.name_scope('PathReg'):

@@ -600,6 +600,8 @@ def D_stylegan(
         with tf.variable_scope('Dense0'):
             x = apply_bias_act(dense_layer(x, fmaps=nf(0)), act=act)
 
+    x1 = x
+
     # Output layer with label conditioning from "Which Training Methods for GANs do actually Converge?"
     with tf.variable_scope('Output'):
         x = apply_bias_act(dense_layer(x, fmaps=max(labels_in.shape[1], 1)))
@@ -607,10 +609,14 @@ def D_stylegan(
             x = tf.reduce_sum(x * labels_in, axis=1, keepdims=True)
     scores_out = x
 
+    with tf.variable_scope('OutputMode'):
+        x = apply_bias_act(dense_layer(x1, fmaps=max(labels_in.shape[1], 1)))
+    mode_out = x
+
     # Output.
     assert scores_out.dtype == tf.as_dtype(dtype)
     scores_out = tf.identity(scores_out, name='scores_out')
-    return scores_out
+    return scores_out, mode_out
 
 #----------------------------------------------------------------------------
 # StyleGAN2 discriminator (Figure 7).
@@ -692,6 +698,8 @@ def D_stylegan2(
         with tf.variable_scope('Dense0'):
             x = apply_bias_act(dense_layer(x, fmaps=nf(0)), act=act)
 
+    x1 = x
+
     # Output layer with label conditioning from "Which Training Methods for GANs do actually Converge?"
     with tf.variable_scope('Output'):
         x = apply_bias_act(dense_layer(x, fmaps=max(labels_in.shape[1], 1)))
@@ -699,10 +707,17 @@ def D_stylegan2(
             x = tf.reduce_sum(x * labels_in, axis=1, keepdims=True)
     scores_out = x
 
+    with tf.variable_scope('OutputMode'):
+        #x = apply_bias_act(dense_layer(x1, fmaps=max(labels_in.shape[1], 1)))
+        x = apply_bias_act(dense_layer(x1, fmaps=65536))
+        x = tf.reshape(x, [-1, 1, x.shape[-1]])
+        #import pdb; pdb.set_trace()
+    mode_out = x
+
     # Output.
     assert scores_out.dtype == tf.as_dtype(dtype)
     scores_out = tf.identity(scores_out, name='scores_out')
-    return scores_out
+    return scores_out, mode_out
 
 #----------------------------------------------------------------------------
 
