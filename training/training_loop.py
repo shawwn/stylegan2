@@ -153,7 +153,7 @@ def set_shapes(batch_size, num_channels, resolution, label_size, images, labels,
 import functools
 from tensorflow.python.platform import gfile
 
-def get_input_fn(load_training_set, num_cores):
+def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
     self = training_set = load_training_set(batch_size=0)
 
     def input_fn(params):
@@ -184,7 +184,7 @@ def get_input_fn(load_training_set, num_cores):
             dset = dset.batch(batch_size)
 
             def dataset_parser_dynamic(features, labels):
-                features, labels = process_reals(features, labels, lod=0.0, mirror_augment=False, drange_data=training_set.dynamic_range, drange_net=[-1, 1])
+                features, labels = process_reals(features, labels, lod=0.0, mirror_augment=mirror_augment, drange_data=training_set.dynamic_range, drange_net=drange_net)
                 return features, labels
 
             if False:
@@ -326,7 +326,7 @@ def training_loop(
     #dset, input_fn = get_input_fn(training_set, num_gpus*32)
     def load_training_set(**kws):
         return dataset.load_dataset(data_dir=dnnlib.convert_path(data_dir), verbose=True, **dataset_args, **kws)
-    input_fn, training_set = get_input_fn(load_training_set, num_gpus)
+    input_fn, training_set = get_input_fn(load_training_set, num_gpus, mirror_augment=mirror_augment, drange_net=drange_net)
 
     def model_fn(features, labels, mode, params):
         nonlocal G_opt_args, D_opt_args, sched_args, G_reg_interval, D_reg_interval, lazy_regularization, G_smoothing_kimg
