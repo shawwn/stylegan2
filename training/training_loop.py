@@ -160,7 +160,6 @@ def get_input_fn(load_training_set, num_cores):
         batch_size = params["batch_size"]
         #import pdb; pdb.set_trace()
     
-        #tfr_file, tfr_shape, tfr_lod = training_set.tfr[-1]
         #num_channels = tfr_shape[0]
         #resolution = tfr_shape[1]
         num_channels = training_set.shape[0]
@@ -171,11 +170,18 @@ def get_input_fn(load_training_set, num_cores):
         tfr_files = sorted(tf.io.gfile.glob(os.path.join(training_set.tfrecord_dir, '*-r%02d.tfrecords' % resolution_log2)))
         assert len(tfr_files) == 1
 
+        lod_index = -1
+        for tfr_file, tfr_shape, tfr_lod in training_set.tfr:
+          if tfr_shape[1] == resolution and tfr_shape[2] == resolution:
+            lod_index = tfr_lod
+        assert lod_index >= 0
+
         #num_cores = batch_size
-        if False:
+        if True:
             training_set.finalize()
             label_size = training_set.label_size
-            dset = training_set._tf_datasets[tfr_lod]
+            dset = training_set._tf_datasets[lod_index]
+            dset = dset.batch(batch_size)
 
             def dataset_parser_dynamic(features, labels):
                 features, labels = process_reals(features, labels, lod=0.0, mirror_augment=False, drange_data=training_set.dynamic_range, drange_net=[-1, 1])

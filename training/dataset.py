@@ -115,6 +115,7 @@ class TFRecordDataset:
             self._np_labels = self._np_labels[:max_images]
         self.label_size = self._np_labels.shape[1]
         self.label_dtype = self._np_labels.dtype.name
+        self.tfr = list(zip(tfr_files, tfr_shapes, tfr_lods))
 
         def finalize():
           # Build TF expressions.
@@ -123,7 +124,6 @@ class TFRecordDataset:
               self._tf_labels_var, self._tf_labels_init = tflib.create_var_with_large_initial_value2(self._np_labels, name='labels_var')
               with tf.control_dependencies([self._tf_labels_init]):
                   self._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(self._tf_labels_var)
-              self.tfr = list(zip(tfr_files, tfr_shapes, tfr_lods))
               for tfr_file, tfr_shape, tfr_lod in self.tfr:
                   if tfr_lod < 0:
                       continue
