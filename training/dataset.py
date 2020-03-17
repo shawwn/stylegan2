@@ -25,7 +25,7 @@ class TFRecordDataset:
         tfrecord_dir,               # Directory containing a collection of tfrecords files.
         resolution      = None,     # Dataset resolution, None = autodetect.
         label_file      = None,     # Relative path of the labels file, None = autodetect.
-        max_label_size  = 0,        # 0 = no labels, 'full' = full labels, <int> = N first label components.
+        max_label_size  = None,     # 0 = no labels, 'full' = full labels, <int> = N first label components.
         max_images      = None,     # Maximum number of images to use, None = use all images.
         repeat          = True,     # Repeat dataset indefinitely?
         shuffle_mb      = 4096,     # Shuffle data within specified window (megabytes), 0 = disable shuffling.
@@ -33,6 +33,16 @@ class TFRecordDataset:
         buffer_mb       = 256,      # Read buffer size (megabytes).
         batch_size      = None,     # Fixed batch size
         num_threads     = 2):       # Number of concurrent threads.
+
+        if max_label_size is None:
+          if 'LABEL_SIZE' not in os.environ:
+            max_label_size = 0
+          else:
+            try:
+              max_label_size = int(os.environ['LABEL_SIZE'])
+            except:
+              max_label_size = os.environ['LABEL_SIZE']
+        assert max_label_size == 'full' or isinstance(max_label_size, int) and max_label_size >= 0
 
         self.tfrecord_dir       = tfrecord_dir
         self.resolution         = None
@@ -71,6 +81,16 @@ class TFRecordDataset:
             res = 2**level
             tfr_shapes.append((3, res, res))
 
+        # Autodetect label filename.
+        if self.label_file is None:
+            guess = sorted(tf.io.gfile.glob(os.path.join(self.tfrecord_dir, '*.labels')))
+            if len(guess):
+                self.label_file = guess[0]
+        elif not tf.io.gfile.exists(self.label_file):
+            guess = os.path.join(self.tfrecord_dir, self.label_file)
+            if tf.io.gfile.exists(guess):
+                self.label_file = guess
+
         # Determine shape and resolution.
         max_shape = max(tfr_shapes, key=np.prod)
         self.resolution = resolution if resolution is not None else max_shape[1]
@@ -86,7 +106,8 @@ class TFRecordDataset:
         assert max_label_size == 'full' or max_label_size >= 0
         self._np_labels = np.zeros([1<<16, 0], dtype=np.float32)
         if self.label_file is not None and max_label_size != 0:
-            self._np_labels = np.load(self.label_file)
+            with gfile.GFile(self.label_file, 'rb') as f:
+              self._np_labels = np.load(f)
             assert self._np_labels.ndim == 2
         if max_label_size != 'full' and self._np_labels.shape[1] > max_label_size:
             self._np_labels = self._np_labels[:, :max_label_size]
