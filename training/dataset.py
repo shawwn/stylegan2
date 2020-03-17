@@ -116,32 +116,35 @@ class TFRecordDataset:
         self.label_size = self._np_labels.shape[1]
         self.label_dtype = self._np_labels.dtype.name
 
-        # Build TF expressions.
-        with tf.name_scope('Dataset'), tflex.device('/cpu:0'):
-            self._tf_minibatch_in = batch_size if batch_size is not None or batch_size <= 0 else tf.placeholder(tf.int64, name='minibatch_in', shape=[])
-            self._tf_labels_var, self._tf_labels_init = tflib.create_var_with_large_initial_value2(self._np_labels, name='labels_var')
-            with tf.control_dependencies([self._tf_labels_init]):
-                self._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(self._tf_labels_var)
-            for tfr_file, tfr_shape, tfr_lod in zip(tfr_files, tfr_shapes, tfr_lods):
-                if tfr_lod < 0:
-                    continue
-                dset = tf.data.TFRecordDataset(tfr_file, compression_type='', buffer_size=buffer_mb<<20)
-                if max_images is not None:
-                    dset = dset.take(max_images)
-                dset = dset.map(self.parse_tfrecord_tf, num_parallel_calls=num_threads)
-                dset = tf.data.Dataset.zip((dset, self._tf_labels_dataset))
-                bytes_per_item = np.prod(tfr_shape) * np.dtype(self.dtype).itemsize
-                if shuffle_mb > 0:
-                    dset = dset.shuffle(((shuffle_mb << 20) - 1) // bytes_per_item + 1)
-                if repeat:
-                    dset = dset.repeat()
-                if prefetch_mb > 0:
-                    dset = dset.prefetch(((prefetch_mb << 20) - 1) // bytes_per_item + 1)
-                if batch_size is None or batch_size > 0:
-                    dset = dset.batch(self._tf_minibatch_in)
-                self._tf_datasets[tfr_lod] = dset
-            self._tf_iterator = tf.data.Iterator.from_structure(self._tf_datasets[0].output_types, self._tf_datasets[0].output_shapes)
-            self._tf_init_ops = {lod: self._tf_iterator.make_initializer(dset) if batch_size is None else tf.no_op() for lod, dset in self._tf_datasets.items()}
+        def finalize():
+          # Build TF expressions.
+          with tf.name_scope('Dataset'), tflex.device('/cpu:0'):
+              self._tf_minibatch_in = batch_size if batch_size is not None or batch_size <= 0 else tf.placeholder(tf.int64, name='minibatch_in', shape=[])
+              self._tf_labels_var, self._tf_labels_init = tflib.create_var_with_large_initial_value2(self._np_labels, name='labels_var')
+              with tf.control_dependencies([self._tf_labels_init]):
+                  self._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(self._tf_labels_var)
+              self.tfr = list(zip(tfr_files, tfr_shapes, tfr_lods))
+              for tfr_file, tfr_shape, tfr_lod in self.tfr:
+                  if tfr_lod < 0:
+                      continue
+                  dset = tf.data.TFRecordDataset(tfr_file, compression_type='', buffer_size=buffer_mb<<20)
+                  if max_images is not None:
+                      dset = dset.take(max_images)
+                  dset = dset.map(self.parse_tfrecord_tf, num_parallel_calls=num_threads)
+                  dset = tf.data.Dataset.zip((dset, self._tf_labels_dataset))
+                  bytes_per_item = np.prod(tfr_shape) * np.dtype(self.dtype).itemsize
+                  if shuffle_mb > 0:
+                      dset = dset.shuffle(((shuffle_mb << 20) - 1) // bytes_per_item + 1)
+                  if repeat:
+                      dset = dset.repeat()
+                  if prefetch_mb > 0:
+                      dset = dset.prefetch(((prefetch_mb << 20) - 1) // bytes_per_item + 1)
+                  if batch_size is None or batch_size > 0:
+                      dset = dset.batch(self._tf_minibatch_in)
+                  self._tf_datasets[tfr_lod] = dset
+              self._tf_iterator = tf.data.Iterator.from_structure(self._tf_datasets[0].output_types, self._tf_datasets[0].output_shapes)
+              self._tf_init_ops = {lod: self._tf_iterator.make_initializer(dset) if batch_size is None else tf.no_op() for lod, dset in self._tf_datasets.items()}
+        self.finalize = finalize
 
     def close(self):
         pass
@@ -151,6 +154,7 @@ class TFRecordDataset:
         lod = int(np.floor(lod))
         assert minibatch_size >= 1 and lod in self._tf_datasets
         if self._cur_minibatch != minibatch_size or self._cur_lod != lod:
+            #self._tf_init_ops[lod].run(*[{self._tf_minibatch_in: minibatch_size}] if not isinstance(self._tf_minibatch_in, int) and self._tf_minibatch_in is not None else [])
             self._tf_init_ops[lod].run({self._tf_minibatch_in: minibatch_size})
             self._cur_minibatch = minibatch_size
             self._cur_lod = lod

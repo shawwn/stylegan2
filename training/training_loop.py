@@ -154,39 +154,59 @@ import functools
 from tensorflow.python.platform import gfile
 
 def get_input_fn(load_training_set, num_cores):
-    training_set = load_training_set(batch_size=0)
-    num_channels = training_set.shape[0]
-    resolution = training_set.shape[1]
-    resolution_log2 = int(np.log2(resolution))
-    label_size = training_set.label_size
-    assert gfile.IsDirectory(training_set.tfrecord_dir)
-    tfr_files = sorted(tf.io.gfile.glob(os.path.join(training_set.tfrecord_dir, '*-r%02d.tfrecords' % resolution_log2)))
-    assert len(tfr_files) == 1
+    self = training_set = load_training_set(batch_size=0)
 
     def input_fn(params):
         batch_size = params["batch_size"]
+        #import pdb; pdb.set_trace()
+    
+        #tfr_file, tfr_shape, tfr_lod = training_set.tfr[-1]
+        #num_channels = tfr_shape[0]
+        #resolution = tfr_shape[1]
+        num_channels = training_set.shape[0]
+        resolution = training_set.shape[1]
+        resolution_log2 = int(np.log2(resolution))
+        label_size = training_set.label_size
+        assert gfile.IsDirectory(training_set.tfrecord_dir)
+        tfr_files = sorted(tf.io.gfile.glob(os.path.join(training_set.tfrecord_dir, '*-r%02d.tfrecords' % resolution_log2)))
+        assert len(tfr_files) == 1
+
         #num_cores = batch_size
-        if True:
+        if False:
+            training_set.finalize()
+            label_size = training_set.label_size
+            dset = training_set._tf_datasets[tfr_lod]
+
+            def dataset_parser_dynamic(features, labels):
+                features, labels = process_reals(features, labels, lod=0.0, mirror_augment=False, drange_data=training_set.dynamic_range, drange_net=[-1, 1])
+                return features, labels
+
+            if False:
+                dset = dset.apply(
+                    tf.contrib.data.map_and_batch(
+                        dataset_parser_dynamic,
+                        batch_size=batch_size,
+                        num_parallel_batches=tf.data.experimental.AUTOTUNE,
+                        drop_remainder=True))
+            else:
+                dset = dset.map(
+                        dataset_parser_dynamic,
+                        num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+            # Assign static batch size dimension
+            dset = dset.map(functools.partial(set_shapes, batch_size, num_channels, resolution, label_size))
+            return dset
+        elif True:
             #dset = training_set._tf_datasets[0]
             #dset = tf.data.TFRecordDataset(tfr_file, compression_type='', buffer_size=buffer_mb << 20)
             dset = tf.data.Dataset.from_tensor_slices(tfr_files)
-            dset = dset.apply(
-                tf.data.experimental.parallel_interleave(tf.data.TFRecordDataset, cycle_length=4, sloppy=True))
+            dset = dset.apply(tf.data.experimental.parallel_interleave(tf.data.TFRecordDataset, cycle_length=4, sloppy=True))
 
-            def _parse_function(example_proto):
-                features = {
-                    "hash": tf.VarLenFeature(tf.string),
-                    "text": tf.VarLenFeature(tf.int64)
-                }
-                parsed_features = tf.parse_single_example(example_proto, features)
-                return parsed_features["text"], parsed_features["text"].dense_shape[0]
-
-            #_tf_labels_var, _tf_labels_init = tflib.create_var_with_large_initial_value2(training_set._np_labels, name='labels_var', trainable=False)
-            #with tf.control_dependencies([_tf_labels_init]):
-            #    _tf_labels_dataset = tf.data.Dataset.from_tensor_slices(_tf_labels_var)
-            _tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._np_labels)
+            training_set._tf_labels_var, training_set._tf_labels_init = tflib.create_var_with_large_initial_value2(training_set._np_labels, name='labels_var', trainable=False)
+            with tf.control_dependencies([training_set._tf_labels_init]):
+                training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._tf_labels_var)
             dset = dset.map(dataset.TFRecordDataset.parse_tfrecord_tf, num_parallel_calls=2)
-            dset = tf.data.Dataset.zip((dset, _tf_labels_dataset))
+            dset = tf.data.Dataset.zip((dset, training_set._tf_labels_dataset))
 
             shuffle_mb = 4096  # Shuffle data within specified window (megabytes), 0 = disable shuffling.
             prefetch_mb = 2048  # Amount of data to prefetch (megabytes), 0 = disable prefetching.
@@ -245,7 +265,7 @@ def get_input_fn(load_training_set, num_cores):
             dset = tf.data.Dataset.from_tensor_slices((features, labels))
             dset = dset.repeat().batch(batch_size, drop_remainder=True)
         return dset
-    return input_fn
+    return input_fn, training_set
 
 #----------------------------------------------------------------------------
 # Main training script.
@@ -300,19 +320,11 @@ def training_loop(
     #dset, input_fn = get_input_fn(training_set, num_gpus*32)
     def load_training_set(**kws):
         return dataset.load_dataset(data_dir=dnnlib.convert_path(data_dir), verbose=True, **dataset_args, **kws)
-    input_fn = get_input_fn(load_training_set, num_gpus)
+    input_fn, training_set = get_input_fn(load_training_set, num_gpus)
 
     def model_fn(features, labels, mode, params):
         nonlocal G_opt_args, D_opt_args, sched_args, G_reg_interval, D_reg_interval, lazy_regularization, G_smoothing_kimg
         assert mode == tf.estimator.ModeKeys.TRAIN
-        #import pdb; pdb.set_trace()
-        #training_set = params['training_set']
-        class TrainingSetStub(object):
-            def __init__(self, labels):
-                self._labels = labels
-            def get_random_labels_tf(self, batch_size):
-                return self._labels
-        training_set = TrainingSetStub(labels)
         num_channels = features.shape[1].value
         resolution = features.shape[2].value
         label_size = labels.shape[1].value
@@ -330,7 +342,6 @@ def training_loop(
         sched_args = dict(sched_args)
         G_opt = tflib.Optimizer(name='TrainG', cross_shard=True, learning_rate=sched_args['G_lrate_base'], **G_opt_args)
         D_opt = tflib.Optimizer(name='TrainD', cross_shard=True, learning_rate=sched_args['D_lrate_base'], **D_opt_args)
-        #import pdb; pdb.set_trace()
         with tf.name_scope('G_loss'):
             G_loss, G_reg = dnnlib.util.call_func_by_name(G=G_gpu, D=D_gpu, opt=G_opt, training_set=training_set,
                                                           minibatch_size=minibatch_gpu_in, **G_loss_args)
@@ -338,7 +349,6 @@ def training_loop(
             D_loss, D_reg = dnnlib.util.call_func_by_name(G=G_gpu, D=D_gpu, opt=D_opt, training_set=training_set,
                                                           minibatch_size=minibatch_gpu_in, reals=reals_read,
                                                           labels=labels_read, **D_loss_args)
-        #import pdb; pdb.set_trace()
 
         # Register gradients.
         #G_reg_interval = tf.constant(G_reg_interval, tf.int64)
