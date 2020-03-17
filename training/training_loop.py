@@ -177,7 +177,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
         assert lod_index >= 0
 
         #num_cores = batch_size
-        if True:
+        if False:
             training_set.finalize()
             label_size = training_set.label_size
             dset = training_set._tf_datasets[lod_index]
