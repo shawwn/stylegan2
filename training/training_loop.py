@@ -318,6 +318,7 @@ def training_loop(
         label_size = labels.shape[1].value
         G = tflib.Network('G', num_channels=num_channels, resolution=resolution, label_size=label_size, **G_args)
         D = tflib.Network('D', num_channels=num_channels, resolution=resolution, label_size=label_size, **D_args)
+        G.print_layers(); D.print_layers()
         Gs, Gs_finalize = G.clone2('Gs')
         G_gpu = G
         D_gpu = D
