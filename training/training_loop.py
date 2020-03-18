@@ -213,7 +213,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                 with tf.control_dependencies([training_set._tf_labels_init]):
                     training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._tf_labels_var)
             else:
-                _tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._np_labels)
+                training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._np_labels)
 
             dset = dset.map(dataset.TFRecordDataset.parse_tfrecord_tf, num_parallel_calls=2)
             dset = tf.data.Dataset.zip((dset, training_set._tf_labels_dataset))
