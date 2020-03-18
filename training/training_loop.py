@@ -236,7 +236,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
             def dataset_parser_dynamic(features, labels):
                 #features, labels = set_shapes(batch_size, num_channels, resolution, label_size, features, labels)
                 #features, labels = set_shapes(None, num_channels, resolution, label_size, features, labels)
-                features, labels = process_reals(features, labels, lod=0.0, mirror_augment=False, drange_data=training_set.dynamic_range, drange_net=[-1, 1])
+                features, labels = process_reals(features, labels, lod=0.0, mirror_augment=mirror_augment, drange_data=training_set.dynamic_range, drange_net=drange_net)
                 #features = tf.cast(features, tf.float32)
                 return features, labels
 
