@@ -208,7 +208,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
             dset = tf.data.Dataset.from_tensor_slices(tfr_files)
             dset = dset.apply(tf.data.experimental.parallel_interleave(tf.data.TFRecordDataset, cycle_length=4, sloppy=True))
 
-            if training_set.labels_file is not None:
+            if training_set.label_file is not None:
                 training_set._tf_labels_var, training_set._tf_labels_init = tflib.create_var_with_large_initial_value2(training_set._np_labels, name='labels_var', trainable=False)
                 with tf.control_dependencies([training_set._tf_labels_init]):
                     training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._tf_labels_var)
