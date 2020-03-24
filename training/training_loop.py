@@ -288,6 +288,7 @@ def imagenet_dataset(path, resize=None, seed=None):
     dataset = dataset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     return dataset
 
+from . import imagenet_input
 
 def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
     self = training_set = load_training_set(batch_size=0)
@@ -341,18 +342,27 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
         elif True:
             #dset = training_set._tf_datasets[0]
             #dset = tf.data.TFRecordDataset(tfr_file, compression_type='', buffer_size=buffer_mb << 20)
-            if 'IMAGENET_DATASET' in os.environ:
-                if 'context' in params:
-                    current_host = params['context'].current_input_fn_deployment()[1]
-                    num_hosts = params['context'].num_hosts
+            if 'context' in params:
+                current_host = params['context'].current_input_fn_deployment()[1]
+                num_hosts = params['context'].num_hosts
+            else:
+                if 'dataset_index' in params:
+                    current_host = params['dataset_index']
+                    num_hosts = params['dataset_num_shards']
                 else:
-                    if 'dataset_index' in params:
-                        current_host = params['dataset_index']
-                        num_hosts = params['dataset_num_shards']
-                    else:
-                        current_host = 0
-                        num_hosts = 1
-                dset = imagenet_dataset(os.environ['IMAGENET_DATASET'], resize=resolution, seed=current_host)
+                    current_host = 0
+                    num_hosts = 1
+            if 'IMAGENET_DATASET' in os.environ:
+                dset = imagenet_dataset(os.environ['IMAGENET_DATASET'], resize=resolution, current_host=current_host, num_hosts=num_hosts)
+            elif 'IMAGENET_TFRECORD_DATASET' in os.environ:
+                #dset = imagenet_dataset(os.environ['IMAGENET_DATASET'], resize=resolution, current_host=current_host, num_hosts=num_hosts)
+                ini = imagenet_input.ImageNetInput(os.environ['IMAGENET_TFRECORD_DATASET'], is_training=False, image_size=resolution, num_cores=num_hosts)
+                dset = ini.input_fn(params)
+                def parse_image(img, label):
+                    img = tf.transpose(img, [2, 0, 1])
+                    label = tf.constant([])
+                    return img, label
+                dset = dset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
             else:
                 dset = tf.data.Dataset.from_tensor_slices(tfr_files)
                 dset = dset.apply(tf.data.experimental.parallel_interleave(tf.data.TFRecordDataset, cycle_length=4, sloppy=True))
