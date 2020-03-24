@@ -373,6 +373,8 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                         training_set._np_labels, name='labels_var', trainable=False)
                     with tf.control_dependencies([training_set._tf_labels_init]):
                         training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._tf_labels_var)
+                    training_set.label_size = 1000
+                label_size = training_set.label_size
             else:
                 dset = tf.data.Dataset.from_tensor_slices(tfr_files)
                 dset = dset.apply(tf.data.experimental.parallel_interleave(tf.data.TFRecordDataset, cycle_length=4, sloppy=True))
