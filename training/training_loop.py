@@ -255,7 +255,7 @@ def csv_dataset(path, spec=None, **kws):
 
 def imagenet_dataset(path, resize=None):
     print('Using imagenet dataset %s' % path)
-    dataset = csv_dataset(path, "name,width,height,channels,format,data", select_columns=['data'])
+    dataset = csv_dataset(path, "name,width,height,channels,format,data", header=False)
     def parse_image(x):
       x = x['data'][0]
       img = tf.image.decode_jpeg(tf.io.decode_base64(x))
