@@ -364,7 +364,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                 def parse_image(img, label):
                     img = tf.transpose(img, [0, 3, 1, 2])[0]
                     #label = tf.constant([])
-                    label = tf.one_hot(label, 1000)
+                    label = tf.one_hot(label[0], 1000)
                     return img, label
                 dset = dset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
                 if current_host == 0:
