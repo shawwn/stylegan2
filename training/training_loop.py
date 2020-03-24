@@ -294,6 +294,9 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
     self = training_set = load_training_set(batch_size=0)
 
     def input_fn(params):
+        params = dict(params)
+        if 'BATCH_PER' in os.environ:
+            params['batch_size'] = int(os.environ['BATCH_PER'])
         batch_size = params["batch_size"]
         #import pdb; pdb.set_trace()
     
@@ -358,9 +361,11 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                 path = os.environ['IMAGENET_TFRECORD_DATASET']
                 print('Using imagenet dataset %s (host %d / %d)' % (path, current_host, num_hosts))
                 ini = imagenet_input.ImageNetInput(path, is_training=False, image_size=resolution, num_cores=num_hosts)
-                dset = ini.input_fn(params)
+                iparams = dict(params)
+                iparams['batch_size'] = 1
+                dset = ini.input_fn(iparams)
                 def parse_image(img, label):
-                    img = tf.transpose(img, [2, 0, 1])
+                    img = tf.transpose(img, [0, 3, 1, 2])[0]
                     label = tf.constant([])
                     return img, label
                 dset = dset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
