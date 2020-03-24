@@ -368,7 +368,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                     return img, label
                 dset = dset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
                 if current_host == 0:
-                    training_set._np_labels = np.array([[1.0 if i == j else 0.0 for j in range(1000)] for i in range(1000)])
+                    training_set._np_labels = np.array([[1.0 if i == j else 0.0 for j in range(1000)] for i in range(1000)], dtype=np.float32)
                     training_set._tf_labels_var, training_set._tf_labels_init = tflib.create_var_with_large_initial_value2(
                         training_set._np_labels, name='labels_var', trainable=False)
                     with tf.control_dependencies([training_set._tf_labels_init]):
