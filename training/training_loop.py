@@ -212,7 +212,25 @@ def random_crop(image_bytes, scope=None, resize=None, method=tf.image.ResizeMeth
             image = tf.image.resize([image], image_size, method=method)[0]
         return image
 
+def _decode_and_center_crop(image_bytes, image_size, crop_padding=0):
+  """Crops to center of image with padding then scales image_size."""
+  shape = tf.image.extract_jpeg_shape(image_bytes)
+  image_height = shape[0]
+  image_width = shape[1]
 
+  padded_center_crop_size = tf.cast(
+      ((image_size / (image_size + crop_padding)) *
+       tf.cast(tf.minimum(image_height, image_width), tf.float32)),
+      tf.int32)
+
+  offset_height = ((image_height - padded_center_crop_size) + 1) // 2
+  offset_width = ((image_width - padded_center_crop_size) + 1) // 2
+  crop_window = tf.stack([offset_height, offset_width,
+                          padded_center_crop_size, padded_center_crop_size])
+  image = tf.image.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
+  image = tf.image.resize_area([image], [image_size, image_size])[0]
+
+  return image
 
 from tensorflow.python.data.experimental.ops import readers
 from tensorflow.python.data.kernel_tests import test_base
@@ -253,16 +271,17 @@ def csv_dataset(path, spec=None, **kws):
   column_types = None if spec is None else [x[1] for x in columns]
   return readers.make_csv_dataset(path, batch_size=1, column_names=column_names, column_defaults=column_types, **kws)
 
-def imagenet_dataset(path, resize=None):
+def imagenet_dataset(path, resize=None, seed=None):
     print('Using imagenet dataset %s' % path)
     #dataset = csv_dataset(path, "name,width,height,channels,format,data", header=False, shuffle=False, sloppy=True, num_parallel_reads=16)
     dataset = readers.make_csv_dataset(path, batch_size=1, column_names="name,width,height,channels,format,data".split(','),
                                        column_defaults=[dtypes.string], select_columns=['data'],
-                                       header=False, shuffle=False, sloppy=True, num_parallel_reads=16, ignore_errors=True)
+                                       header=False, shuffle=True, shuffle_seed=seed, sloppy=True, num_parallel_reads=16, ignore_errors=True)
     def parse_image(x):
       x = x['data'][0]
       data = tf.io.decode_base64(x)
-      img = random_crop(data, resize=resize)
+      #img = random_crop(data, resize=resize)
+      img = _decode_and_center_crop(data, resize)
       img = tf.transpose(img, [2,0,1])
       label = tf.constant([])
       return img, label
@@ -323,7 +342,17 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
             #dset = training_set._tf_datasets[0]
             #dset = tf.data.TFRecordDataset(tfr_file, compression_type='', buffer_size=buffer_mb << 20)
             if 'IMAGENET_DATASET' in os.environ:
-                dset = imagenet_dataset(os.environ['IMAGENET_DATASET'], resize=resolution)
+                if 'context' in params:
+                    current_host = params['context'].current_input_fn_deployment()[1]
+                    num_hosts = params['context'].num_hosts
+                else:
+                    if 'dataset_index' in params:
+                        current_host = params['dataset_index']
+                        num_hosts = params['dataset_num_shards']
+                    else:
+                        current_host = 0
+                        num_hosts = 1
+                dset = imagenet_dataset(os.environ['IMAGENET_DATASET'], resize=resolution, seed=current_host)
             else:
                 dset = tf.data.Dataset.from_tensor_slices(tfr_files)
                 dset = dset.apply(tf.data.experimental.parallel_interleave(tf.data.TFRecordDataset, cycle_length=4, sloppy=True))
