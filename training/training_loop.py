@@ -258,8 +258,8 @@ def imagenet_dataset(path, resize=None):
     dataset = csv_dataset(path, "name,width,height,channels,format,data", header=False)
     def parse_image(x):
       x = x['data'][0]
-      img = tf.image.decode_jpeg(tf.io.decode_base64(x))
-      img = random_crop(img, resize=resize)
+      data = tf.io.decode_base64(x)
+      img = random_crop(data, resize=resize)
       label = tf.constant([])
       return img, label
     dataset = dataset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
