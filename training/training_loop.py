@@ -153,6 +153,117 @@ def set_shapes(batch_size, num_channels, resolution, label_size, images, labels,
 import functools
 from tensorflow.python.platform import gfile
 
+
+def tf_randi(*args, **kws):
+    assert len(args) > 0
+    if len(args) == 1:
+        lo, hi = [0] + [x for x in args]
+    else:
+        lo, hi = args
+    return tf.random.uniform((), minval=lo, maxval=hi, dtype=tf.int32, **kws)
+
+
+def tf_rand(*args, **kws):
+    if len(args) == 0:
+        lo, hi = 0.0, 1.0
+    elif len(args) == 1:
+        lo, hi = [0] + [x for x in args]
+    else:
+        lo, hi = args
+    return tf.random.uniform((), minval=lo, maxval=hi, **kws)
+
+
+def tf_biased_rand(*args, bias=1, **kws):
+    x = tf_rand(*args, **kws)
+    # simple technique to bias the result towards the center.
+    for i in range(bias - 1):
+        x += tf_rand(*args, **kws)
+    dtype = kws.pop('dtype') if 'dtype' in kws else tf.float32
+    x = tf.cast(x, tf.float32) / bias
+    x = tf.cast(x, dtype)
+    return x
+
+
+def tf_between(*args, bias=1, **kws):
+    if bias <= 0:
+        return tf_randi(*args, **kws)
+    else:
+        return tf_biased_rand(*args, dtype=tf.int32, bias=bias, **kws)
+
+
+def random_crop(image_bytes, scope=None, resize=None, method=tf.image.ResizeMethod.AREA, seed=None):
+    with tf.name_scope(scope, 'random_crop', [image_bytes]):
+        shape = tf.image.extract_jpeg_shape(image_bytes)
+        w = shape[0]
+        h = shape[1]
+        channels = shape[2]
+        x, y = 0, 0
+        n = 3
+        image = tf.cond(w > h,
+                        lambda: tf.image.decode_and_crop_jpeg(image_bytes,
+                                                              tf.stack([x + tf_between(w - h, seed=seed), y, h, h]),
+                                                              channels=n),
+                        lambda: tf.cond(h > w,
+                                        lambda: tf.image.decode_and_crop_jpeg(image_bytes, tf.stack(
+                                            [x, y + tf_between(h - w, seed=seed), w, w]), channels=n),
+                                        lambda: tf.image.decode_jpeg(image_bytes, channels=n)))
+        if resize:
+            image_size = [resize, resize] if isinstance(resize, int) or isinstance(resize, float) else resize
+            image = tf.image.resize([image], image_size, method=method)[0]
+        return image
+
+
+
+from tensorflow.python.data.experimental.ops import readers
+from tensorflow.python.data.kernel_tests import test_base
+from tensorflow.python.data.ops import dataset_ops
+from tensorflow.python.data.util import nest
+from tensorflow.python.framework import constant_op
+from tensorflow.python.framework import dtypes
+from tensorflow.python.framework import errors
+from tensorflow.python.framework import test_util
+from tensorflow.python.platform import test
+
+type_map = {
+    'int32': dtypes.int32,
+    'int64': dtypes.int64,
+    'uint32': dtypes.uint32,
+    'uint64': dtypes.uint64,
+    'float32': dtypes.float32,
+    'float64': dtypes.float64,
+    'string': dtypes.string,
+    'i32': dtypes.int32,
+    'i64': dtypes.int64,
+    'u32': dtypes.uint32,
+    'u64': dtypes.uint64,
+    'f32': dtypes.float32,
+    'f64': dtypes.float64,
+    's': dtypes.string,
+}
+
+def parse_header(x):
+  if '=' in x:
+    name, kind = x.split('=')
+    return name, constant_op.constant([], type_map[kind])
+  return x, constant_op.constant([], dtypes.string)
+
+def csv_dataset(path, spec=None, **kws):
+  columns = [] if spec is None else [parse_header(x) for x in spec.split(',')]
+  column_names = None if spec is None else [x[0] for x in columns]
+  column_types = None if spec is None else [x[1] for x in columns]
+  return readers.make_csv_dataset(path, batch_size=1, column_names=column_names, column_defaults=column_types, **kws)
+
+def imagenet_dataset(path, resize=None):
+    dataset = csv_dataset(path, "name,width,height,channels,format,data", select_columns=['data'])
+    def parse_image(x):
+      x = x['data'][0]
+      img = tf.image.decode_jpeg(tf.io.decode_base64(x))
+      img = random_crop(img, resize=resize)
+      label = tf.constant([])
+      return img, label
+    dataset = dataset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    return dataset
+
 def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
     self = training_set = load_training_set(batch_size=0)
 
@@ -205,18 +316,21 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
         elif True:
             #dset = training_set._tf_datasets[0]
             #dset = tf.data.TFRecordDataset(tfr_file, compression_type='', buffer_size=buffer_mb << 20)
-            dset = tf.data.Dataset.from_tensor_slices(tfr_files)
-            dset = dset.apply(tf.data.experimental.parallel_interleave(tf.data.TFRecordDataset, cycle_length=4, sloppy=True))
-
-            if training_set.label_file is not None:
-                training_set._tf_labels_var, training_set._tf_labels_init = tflib.create_var_with_large_initial_value2(training_set._np_labels, name='labels_var', trainable=False)
-                with tf.control_dependencies([training_set._tf_labels_init]):
-                    training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._tf_labels_var)
+            if 'IMAGENET_DATASET' in os.environ:
+                dset = imagenet_dataset(os.environ['IMAGENET_DATASET'], resize=resolution)
             else:
-                training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._np_labels)
+                dset = tf.data.Dataset.from_tensor_slices(tfr_files)
+                dset = dset.apply(tf.data.experimental.parallel_interleave(tf.data.TFRecordDataset, cycle_length=4, sloppy=True))
 
-            dset = dset.map(dataset.TFRecordDataset.parse_tfrecord_tf, num_parallel_calls=2)
-            dset = tf.data.Dataset.zip((dset, training_set._tf_labels_dataset))
+                if training_set.label_file is not None:
+                    training_set._tf_labels_var, training_set._tf_labels_init = tflib.create_var_with_large_initial_value2(training_set._np_labels, name='labels_var', trainable=False)
+                    with tf.control_dependencies([training_set._tf_labels_init]):
+                        training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._tf_labels_var)
+                else:
+                    training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._np_labels)
+
+                dset = dset.map(dataset.TFRecordDataset.parse_tfrecord_tf, num_parallel_calls=2)
+                dset = tf.data.Dataset.zip((dset, training_set._tf_labels_dataset))
 
             shuffle_mb = 4096  # Shuffle data within specified window (megabytes), 0 = disable shuffling.
             prefetch_mb = 2048  # Amount of data to prefetch (megabytes), 0 = disable prefetching.
