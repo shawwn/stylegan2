@@ -13,9 +13,6 @@
 # limitations under the License.
 # ==============================================================================
 """ImageNet preprocessing for ResNet."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 from absl import flags
 import tensorflow as tf
@@ -211,10 +208,6 @@ def preprocess_image(image_bytes,
 # limitations under the License.
 # ==============================================================================
 """Efficient ImageNet input pipeline using tf.data.Dataset."""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import abc
 from collections import namedtuple

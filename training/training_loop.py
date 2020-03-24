@@ -355,8 +355,9 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
             if 'IMAGENET_DATASET' in os.environ:
                 dset = imagenet_dataset(os.environ['IMAGENET_DATASET'], resize=resolution, current_host=current_host, num_hosts=num_hosts)
             elif 'IMAGENET_TFRECORD_DATASET' in os.environ:
-                #dset = imagenet_dataset(os.environ['IMAGENET_DATASET'], resize=resolution, current_host=current_host, num_hosts=num_hosts)
-                ini = imagenet_input.ImageNetInput(os.environ['IMAGENET_TFRECORD_DATASET'], is_training=False, image_size=resolution, num_cores=num_hosts)
+                path = os.environ['IMAGENET_TFRECORD_DATASET']
+                print('Using imagenet dataset %s (host %d / %d)' % (path, current_host, num_hosts))
+                ini = imagenet_input.ImageNetInput(path, is_training=False, image_size=resolution, num_cores=num_hosts)
                 dset = ini.input_fn(params)
                 def parse_image(img, label):
                     img = tf.transpose(img, [2, 0, 1])
