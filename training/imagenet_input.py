@@ -457,7 +457,7 @@ class ImageNetTFExampleInput(object):
 
     dataset = self.make_source_dataset(current_host, num_hosts)
 
-    if not self.is_training:
+    if not self.is_training and False:
       # Padding for eval.
       dataset = self.pad_dataset(dataset, num_hosts)
 
