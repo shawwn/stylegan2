@@ -294,9 +294,6 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
     self = training_set = load_training_set(batch_size=0)
 
     def input_fn(params):
-        params = dict(params)
-        if 'BATCH_PER' in os.environ:
-            params['batch_size'] = int(os.environ['BATCH_PER'])
         batch_size = params["batch_size"]
         #import pdb; pdb.set_trace()
     
