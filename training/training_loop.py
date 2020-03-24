@@ -254,6 +254,7 @@ def csv_dataset(path, spec=None, **kws):
   return readers.make_csv_dataset(path, batch_size=1, column_names=column_names, column_defaults=column_types, **kws)
 
 def imagenet_dataset(path, resize=None):
+    print('Using imagenet dataset %s' % path)
     dataset = csv_dataset(path, "name,width,height,channels,format,data", select_columns=['data'])
     def parse_image(x):
       x = x['data'][0]
