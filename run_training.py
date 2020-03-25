@@ -56,6 +56,8 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
     sched.D_lrate_base = float(os.environ['D_LR']) if 'D_LR' in os.environ else 0.002
     sched.G_lrate_base *= float(os.environ['G_LR_MULT']) if 'G_LR_MULT' in os.environ else 1.0
     sched.D_lrate_base *= float(os.environ['D_LR_MULT']) if 'D_LR_MULT' in os.environ else 1.0
+    print('G_lrate: %f' % sched.G_lrate_base)
+    print('D_lrate: %f' % sched.D_lrate_base)
     sched.minibatch_size_base = int(os.environ['BATCH_SIZE']) if 'BATCH_SIZE' in os.environ else num_gpus
     sched.minibatch_gpu_base = int(os.environ['BATCH_PER']) if 'BATCH_PER' in os.environ else 1
     D_loss.gamma = 10
