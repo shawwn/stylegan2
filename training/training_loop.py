@@ -376,7 +376,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                     img = tf.transpose(img, [0, 3, 1, 2])[0]
                     #label = tf.constant([])
                     #label = tf.one_hot(label[0], 1000)
-                    label = tf.gather(training_set._tf_labels_var.initialized_value(), label)
+                    label = tf.gather(training_set._tf_labels_var.initialized_value(), label[0])
                     return img, label
                 dset = dset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
             else:
