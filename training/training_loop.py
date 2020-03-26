@@ -355,16 +355,17 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
             if 'IMAGENET_DATASET' in os.environ:
                 dset = imagenet_dataset(os.environ['IMAGENET_DATASET'], resize=resolution, current_host=current_host, num_hosts=num_hosts)
             elif 'IMAGENET_TFRECORD_DATASET' in os.environ:
-                if current_host == 0:
-                    print('Setting labels')
-                    #training_set._np_labels = np.array([[1.0 if i == j else 0.0 for j in range(1000)] for i in range(1000)], dtype=np.float32)
-                    training_set._np_labels = np.array([tflex.sha256label(str(i)) for i in range(1000)], dtype=np.float32)
-                    training_set._tf_labels_var, training_set._tf_labels_init = tflib.create_var_with_large_initial_value2(
-                        training_set._np_labels, name='labels_var', trainable=False)
-                    with tf.control_dependencies([training_set._tf_labels_init]):
-                        training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._tf_labels_var)
-                    #training_set.label_size = 1000
-                    training_set.label_size = len(tflex.sha256label(str(0))) # 28
+                if not 'IMAGENET_UNCONDITIONAL' in os.environ:
+                    if current_host == 0:
+                        print('Setting labels')
+                        #training_set._np_labels = np.array([[1.0 if i == j else 0.0 for j in range(1000)] for i in range(1000)], dtype=np.float32)
+                        training_set._np_labels = np.array([tflex.sha256label(str(i)) for i in range(1000)], dtype=np.float32)
+                        training_set._tf_labels_var, training_set._tf_labels_init = tflib.create_var_with_large_initial_value2(
+                            training_set._np_labels, name='labels_var', trainable=False)
+                        with tf.control_dependencies([training_set._tf_labels_init]):
+                            training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._tf_labels_var)
+                        #training_set.label_size = 1000
+                        training_set.label_size = len(tflex.sha256label(str(0))) # 28
                 label_size = training_set.label_size
                 path = os.environ['IMAGENET_TFRECORD_DATASET']
                 ini = imagenet_input.ImageNetInput(path, is_training=False, image_size=resolution, num_cores=num_hosts)
@@ -374,9 +375,11 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                 print('Using imagenet dataset %s (host %d / %d)' % (path, current_host, num_hosts))
                 def parse_image(img, label):
                     img = tf.transpose(img, [0, 3, 1, 2])[0]
-                    #label = tf.constant([])
-                    #label = tf.one_hot(label[0], 1000)
-                    label = tf.gather(training_set._tf_labels_var.initialized_value(), label[0])
+                    if 'IMAGENET_UNCONDITIONAL' in os.environ:
+                        label = tf.constant([])
+                    else:
+                        #label = tf.one_hot(label[0], 1000)
+                        label = tf.gather(training_set._tf_labels_var.initialized_value(), label[0])
                     return img, label
                 dset = dset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
             else:
