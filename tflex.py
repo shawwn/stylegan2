@@ -958,3 +958,20 @@ def device(name=''):
   if 'cpu' in name:
     return tf.device(name)
   return nullcontext()
+
+def tuples(l, n=2):
+  r = []
+  for i in range(0, len(l), n):
+    r.append(l[i:i+n])
+  return r
+
+import hashlib
+
+def sha256hex(x):
+  if isinstance(x, str):
+    x = x.encode('utf8')
+  return hashlib.sha224(x).hexdigest()
+
+def sha256label(x):
+  return [int(x, 16) / 255 * 2 - 1 for x in tuples(sha256hex(x))]
+
