@@ -83,9 +83,12 @@ class TFRecordDataset:
 
         # Autodetect label filename.
         if self.label_file is None:
-            guess = sorted(tf.io.gfile.glob(os.path.join(self.tfrecord_dir, '*.labels')))
-            if len(guess):
-                self.label_file = guess[0]
+            if 'LABEL_FILE' in os.environ:
+                self.label_file = os.environ['LABEL_FILE']
+            else:
+                guess = sorted(tf.io.gfile.glob(os.path.join(self.tfrecord_dir, '*.labels')))
+                if len(guess):
+                    self.label_file = guess[0]
         elif not tf.io.gfile.exists(self.label_file):
             guess = os.path.join(self.tfrecord_dir, self.label_file)
             if tf.io.gfile.exists(guess):
