@@ -381,7 +381,7 @@ class ImageNetTFExampleInput(object):
 
     parsed = tf.parse_single_example(value, keys_to_features)
     image_bytes = tf.reshape(parsed['image/encoded'], shape=[])
-    image_bytes = tf.io.decode_jpeg(image_bytes, 3)
+    image_bytes = tf.io.decode_image(image_bytes, 3)
 
     # Subtract one so that labels are in [0, 1000).
     label = tf.cast(
