@@ -103,10 +103,10 @@ def _decode_and_random_crop(image_bytes, image_size):
       area_range=(0.08, 1.0),
       max_attempts=10,
       scope=None)
-  return tf.image.resize_bicubic([image], [image_size, image_size])[0]
+  return tf.image.resize_area([image], [image_size, image_size])[0]
 
 
-def _decode_and_center_crop(image_bytes, image_size, crop_padding=32):
+def _decode_and_center_crop_broken(image_bytes, image_size, crop_padding=32):
   """Crops to center of image with padding then scales image_size."""
   shape = tf.image.extract_jpeg_shape(image_bytes)
   image_height = shape[0]
@@ -122,10 +122,15 @@ def _decode_and_center_crop(image_bytes, image_size, crop_padding=32):
   crop_window = tf.stack([offset_height, offset_width,
                           padded_center_crop_size, padded_center_crop_size])
   image = tf.image.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
-  image = tf.image.resize_bicubic([image], [image_size, image_size])[0]
+  image = tf.image.resize_area([image], [image_size, image_size])[0]
 
   return image
 
+def _decode_and_center_crop(image_bytes, image_size, crop_padding=32):
+  image = tf.io.decode_image(image_bytes, channels=3)
+  image = tf.image.central_crop(image, 1.0)
+  image = tf.image.resize_area([image], [image_size, image_size])[0]
+  return image
 
 def _flip(image):
   """Random horizontal image flip."""
