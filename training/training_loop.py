@@ -33,19 +33,21 @@ def process_reals(x, labels, lod, mirror_augment, drange_data, drange_net):
     if mirror_augment:
         with tf.name_scope('MirrorAugment'):
             x = tf.where(tf.random_uniform([tf.shape(x)[0]]) < 0.5, x, tf.reverse(x, [3]))
-    with tf.name_scope('FadeLOD'): # Smooth crossfade between consecutive levels-of-detail.
-        s = tf.shape(x)
-        y = tf.reshape(x, [-1, s[1], s[2]//2, 2, s[3]//2, 2])
-        y = tf.reduce_mean(y, axis=[3, 5], keepdims=True)
-        y = tf.tile(y, [1, 1, 1, 2, 1, 2])
-        y = tf.reshape(y, [-1, s[1], s[2], s[3]])
-        x = tflib.lerp(x, y, lod - tf.floor(lod))
-    with tf.name_scope('UpscaleLOD'): # Upscale to match the expected input/output size of the networks.
-        s = tf.shape(x)
-        factor = tf.cast(2 ** tf.floor(lod), tf.int32)
-        x = tf.reshape(x, [-1, s[1], s[2], 1, s[3], 1])
-        x = tf.tile(x, [1, 1, 1, factor, 1, factor])
-        x = tf.reshape(x, [-1, s[1], s[2] * factor, s[3] * factor])
+    assert lod == 0.0
+    if False:
+        with tf.name_scope('FadeLOD'): # Smooth crossfade between consecutive levels-of-detail.
+            s = tf.shape(x)
+            y = tf.reshape(x, [-1, s[1], s[2]//2, 2, s[3]//2, 2])
+            y = tf.reduce_mean(y, axis=[3, 5], keepdims=True)
+            y = tf.tile(y, [1, 1, 1, 2, 1, 2])
+            y = tf.reshape(y, [-1, s[1], s[2], s[3]])
+            x = tflib.lerp(x, y, lod - tf.floor(lod))
+        with tf.name_scope('UpscaleLOD'): # Upscale to match the expected input/output size of the networks.
+            s = tf.shape(x)
+            factor = tf.cast(2 ** tf.floor(lod), tf.int32)
+            x = tf.reshape(x, [-1, s[1], s[2], 1, s[3], 1])
+            x = tf.tile(x, [1, 1, 1, factor, 1, factor])
+            x = tf.reshape(x, [-1, s[1], s[2] * factor, s[3] * factor])
     return x, labels
 
 #----------------------------------------------------------------------------
