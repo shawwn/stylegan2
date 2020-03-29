@@ -607,12 +607,8 @@ def D_stylegan(
         with tf.variable_scope('Dense0'):
             x = apply_bias_act(dense_layer(x, fmaps=nf(0)), act=act)
 
-    if False:
-        # Output layer with label conditioning from "Which Training Methods for GANs do actually Converge?"
-        with tf.variable_scope('Output'):
-            x = apply_bias_act(dense_layer(x, fmaps=max(labels_in.shape[1], 1)))
-            if labels_in.shape[1] > 0:
-                x = tf.reduce_sum(x * labels_in, axis=1, keepdims=True)
+    with tf.variable_scope('Output'):
+        x = apply_bias_act(dense_layer(x, fmaps=1))
     scores_out = x
 
     # Output.
@@ -702,13 +698,9 @@ def D_stylegan2(
         with tf.variable_scope('Dense0'):
             x = apply_bias_act(dense_layer(x, fmaps=nf(0)), act=act)
 
-    if False:
-        # Output layer with label conditioning from "Which Training Methods for GANs do actually Converge?"
-        with tf.variable_scope('Output'):
-            x = apply_bias_act(dense_layer(x, fmaps=max(labels_in.shape[1], 1)))
-            if labels_in.shape[1] > 0:
-                x = tf.reduce_sum(x * labels_in, axis=1, keepdims=True)
-        scores_out = x
+    with tf.variable_scope('Output'):
+        x = apply_bias_act(dense_layer(x, fmaps=1))
+    scores_out = x
 
     # Output.
     assert scores_out.dtype == tf.as_dtype(dtype)
