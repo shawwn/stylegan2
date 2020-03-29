@@ -358,8 +358,8 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                 if not 'IMAGENET_UNCONDITIONAL' in os.environ:
                     if current_host == 0:
                         print('Setting labels')
-                        #training_set._np_labels = np.array([[1.0 if i == j else 0.0 for j in range(1000)] for i in range(1000)], dtype=np.float32)
-                        training_set._np_labels = np.array([tflex.sha256label(str(i)) for i in range(1000)], dtype=np.float32)
+                        training_set._np_labels = np.array([[1.0 if i == j else 0.0 for j in range(1000)] for i in range(1000)], dtype=np.float32)
+                        #training_set._np_labels = np.array([tflex.sha256label(str(i)) for i in range(1000)], dtype=np.float32)
                         training_set._tf_labels_var, training_set._tf_labels_init = tflib.create_var_with_large_initial_value2(
                             training_set._np_labels, name='labels_var', trainable=False)
                         with tf.control_dependencies([training_set._tf_labels_init]):
@@ -367,6 +367,8 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                         #training_set.label_size = 1000
                         training_set.label_size = len(tflex.sha256label(str(0))) # 28
                 label_size = training_set.label_size
+                num_channels = int(os.environ["NUM_CHANNELS"]) if "NUM_CHANNELS" in os.environ else 3
+                assert num_channels == 3 or num_channels == 4
                 path = os.environ['IMAGENET_TFRECORD_DATASET']
                 ini = imagenet_input.ImageNetInput(path, is_training=False, image_size=resolution, num_cores=num_hosts)
                 iparams = dict(params)
@@ -377,9 +379,20 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                     img = tf.transpose(img, [0, 3, 1, 2])[0]
                     if 'IMAGENET_UNCONDITIONAL' in os.environ:
                         label = tf.constant([])
+                        if num_channels == 4:
+                            r = resolution
+                            n = 1
+                            c = tf.reshape(tf.tile(tf.tile(tf.constant(0, dtype=tf.float32), [tf.math.ceil(r / n)])[0:r], [r]), [r, r])
+                            img = tf.concat([img, [c]], axis=0)
                     else:
-                        #label = tf.one_hot(label[0], 1000)
-                        label = tf.gather(training_set._tf_labels_var.initialized_value(), label[0])
+                        label = label[0]
+                        #label = tf.gather(training_set._tf_labels_var.initialized_value(), label)
+                        if num_channels == 4:
+                            r = resolution
+                            n = label_size #tf.size(label)
+                            c = tf.reshape(tf.tile(tf.tile(label, [tf.math.ceil(r / n)])[0:r], [r]), [r, r])
+                            img = tf.concat([img, [c]], axis=0)
+                        label = tf.one_hot(label, 1000)
                     return img, label
                 dset = dset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
             else:

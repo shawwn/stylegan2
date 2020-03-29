@@ -6,6 +6,7 @@
 
 """Network architectures used in the StyleGAN2 paper."""
 
+import os
 import numpy as np
 import tensorflow as tf
 import dnnlib
@@ -327,6 +328,8 @@ def G_synthesis_stylegan_revised(
     force_clean_graph   = False,        # True = construct a clean graph that looks nice in TensorBoard, False = default behavior.
     **_kwargs):                         # Ignore unrecognized keyword args.
 
+    num_channels = int(os.environ["NUM_CHANNELS"]) if "NUM_CHANNELS" in os.environ else num_channels
+
     resolution_log2 = int(np.log2(resolution))
     assert resolution == 2**resolution_log2 and resolution >= 4
     def nf(stage): return np.clip(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_min, fmap_max)
@@ -435,6 +438,8 @@ def G_synthesis_stylegan2(
     fused_modconv       = True,         # Implement modulated_conv2d_layer() as a single fused op?
     **_kwargs):                         # Ignore unrecognized keyword args.
 
+    num_channels = int(os.environ["NUM_CHANNELS"]) if "NUM_CHANNELS" in os.environ else num_channels
+
     resolution_log2 = int(np.log2(resolution))
     assert resolution == 2**resolution_log2 and resolution >= 4
     def nf(stage): return np.clip(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_min, fmap_max)
@@ -535,6 +540,8 @@ def D_stylegan(
     is_template_graph   = False,        # True = template graph constructed by the Network class, False = actual evaluation.
     **_kwargs):                         # Ignore unrecognized keyword args.
 
+    num_channels = int(os.environ["NUM_CHANNELS"]) if "NUM_CHANNELS" in os.environ else num_channels
+
     resolution_log2 = int(np.log2(resolution))
     assert resolution == 2**resolution_log2 and resolution >= 4
     def nf(stage): return np.clip(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_min, fmap_max)
@@ -600,11 +607,12 @@ def D_stylegan(
         with tf.variable_scope('Dense0'):
             x = apply_bias_act(dense_layer(x, fmaps=nf(0)), act=act)
 
-    # Output layer with label conditioning from "Which Training Methods for GANs do actually Converge?"
-    with tf.variable_scope('Output'):
-        x = apply_bias_act(dense_layer(x, fmaps=max(labels_in.shape[1], 1)))
-        if labels_in.shape[1] > 0:
-            x = tf.reduce_sum(x * labels_in, axis=1, keepdims=True)
+    if False:
+        # Output layer with label conditioning from "Which Training Methods for GANs do actually Converge?"
+        with tf.variable_scope('Output'):
+            x = apply_bias_act(dense_layer(x, fmaps=max(labels_in.shape[1], 1)))
+            if labels_in.shape[1] > 0:
+                x = tf.reduce_sum(x * labels_in, axis=1, keepdims=True)
     scores_out = x
 
     # Output.
@@ -634,6 +642,8 @@ def D_stylegan2(
     dtype               = 'float32',    # Data type to use for activations and outputs.
     resample_kernel     = [1,3,3,1],    # Low-pass filter to apply when resampling activations. None = no filtering.
     **_kwargs):                         # Ignore unrecognized keyword args.
+
+    num_channels = int(os.environ["NUM_CHANNELS"]) if "NUM_CHANNELS" in os.environ else num_channels
 
     resolution_log2 = int(np.log2(resolution))
     assert resolution == 2**resolution_log2 and resolution >= 4
@@ -692,12 +702,13 @@ def D_stylegan2(
         with tf.variable_scope('Dense0'):
             x = apply_bias_act(dense_layer(x, fmaps=nf(0)), act=act)
 
-    # Output layer with label conditioning from "Which Training Methods for GANs do actually Converge?"
-    with tf.variable_scope('Output'):
-        x = apply_bias_act(dense_layer(x, fmaps=max(labels_in.shape[1], 1)))
-        if labels_in.shape[1] > 0:
-            x = tf.reduce_sum(x * labels_in, axis=1, keepdims=True)
-    scores_out = x
+    if False:
+        # Output layer with label conditioning from "Which Training Methods for GANs do actually Converge?"
+        with tf.variable_scope('Output'):
+            x = apply_bias_act(dense_layer(x, fmaps=max(labels_in.shape[1], 1)))
+            if labels_in.shape[1] > 0:
+                x = tf.reduce_sum(x * labels_in, axis=1, keepdims=True)
+        scores_out = x
 
     # Output.
     assert scores_out.dtype == tf.as_dtype(dtype)
