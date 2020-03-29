@@ -374,7 +374,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                 iparams = dict(params)
                 iparams['batch_size'] = 1
                 dset = ini.input_fn(iparams)
-                print('Using imagenet dataset %s (host %d / %d)' % (path, current_host, num_hosts))
+                print('Using imagenet dataset %s (host %d / %d) channels=%d label_size=%d' % (path, current_host, num_hosts, num_channels, label_size))
                 def parse_image(img, label):
                     img = tf.transpose(img, [0, 3, 1, 2])[0]
                     if 'IMAGENET_UNCONDITIONAL' in os.environ:
