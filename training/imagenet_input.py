@@ -353,9 +353,9 @@ class ImageNetTFExampleInput(object):
     image_bytes = tf.reshape(parsed['image/encoded'], shape=[])
 
     # Subtract one so that labels are in [0, 1000).
-    bias = int(os.environ['LABEL_BIAS']) if 'LABEL_BIAS' in os.environ else 1
+    bias = int(os.environ['LABEL_BIAS']) if 'LABEL_BIAS' in os.environ else 0
     label = tf.cast(
-        tf.reshape(parsed['image/class/label'], shape=[]), dtype=tf.int32) - bias
+        tf.reshape(parsed['image/class/label'], shape=[]), dtype=tf.int32) + bias
 
     # Return all black images for padded data.
     image = tf.cond(
@@ -396,9 +396,9 @@ class ImageNetTFExampleInput(object):
     image_bytes = tf.io.decode_image(image_bytes, 3)
 
     # Subtract one so that labels are in [0, 1000).
-    bias = int(os.environ['LABEL_BIAS']) if 'LABEL_BIAS' in os.environ else 1
+    bias = int(os.environ['LABEL_BIAS']) if 'LABEL_BIAS' in os.environ else 0
     label = tf.cast(
-        tf.reshape(parsed['image/class/label'], shape=[]), dtype=tf.int32) - bias
+        tf.reshape(parsed['image/class/label'], shape=[]), dtype=tf.int32) + bias
     return image_bytes, label
 
   def dataset_parser_dynamic(self, image_bytes, label):
