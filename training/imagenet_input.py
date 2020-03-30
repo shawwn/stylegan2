@@ -106,7 +106,7 @@ def _decode_and_random_crop(image_bytes, image_size):
   return tf.image.resize_area([image], [image_size, image_size])[0]
 
 
-def _decode_and_center_crop_broken(image_bytes, image_size, crop_padding=32):
+def _decode_and_center_crop_image(image_bytes, image_size, crop_padding=32):
   """Crops to center of image with padding then scales image_size."""
   shape = tf.image.extract_jpeg_shape(image_bytes)
   image_height = shape[0]
@@ -126,11 +126,16 @@ def _decode_and_center_crop_broken(image_bytes, image_size, crop_padding=32):
 
   return image
 
-def _decode_and_center_crop(image_bytes, image_size, crop_padding=32):
-  image = tf.io.decode_image(image_bytes, channels=3)
-  image = tf.image.central_crop(image, 1.0)
-  image = tf.image.resize_area([image], [image_size, image_size])[0]
-  return image
+def _decode_and_center_crop(image_bytes, image_size, crop_padding=None):
+  if 'NO_CENTER_CROP' in os.environ:
+    image = tf.io.decode_image(image_bytes, channels=3)
+    image = tf.image.central_crop(image, 1.0)
+    image = tf.image.resize_area([image], [image_size, image_size])[0]
+    return image
+  else:
+    if crop_padding is None as 'CROP_PADDING' in os.environ:
+      crop_padding = int(os.environ['CROP_PADDING'])
+    return _decode_and_center_crop_image(image_bytes, image_size, crop_padding=crop_padding)
 
 def _flip(image):
   """Random horizontal image flip."""

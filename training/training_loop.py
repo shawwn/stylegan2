@@ -366,8 +366,8 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                             training_set._np_labels, name='labels_var', trainable=False)
                         with tf.control_dependencies([training_set._tf_labels_init]):
                             training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._tf_labels_var)
-                        #training_set.label_size = 1000
-                        training_set.label_size = len(tflex.sha256label(str(0))) # 28
+                        training_set.label_size = 1000
+                        #training_set.label_size = len(tflex.sha256label(str(0))) # 28
                 label_size = training_set.label_size
                 num_channels = int(os.environ["NUM_CHANNELS"]) if "NUM_CHANNELS" in os.environ else 3
                 assert num_channels == 3 or num_channels == 4
@@ -387,14 +387,16 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                             c = tf.reshape(tf.tile(tf.tile(tf.constant(0, dtype=tf.float32), [tf.math.ceil(r / n)])[0:r], [r]), [r, r])
                             img = tf.concat([img, [c]], axis=0)
                     else:
-                        label = label[0]
+                        #label = label[0]
+                        #label = label[0]
                         #label = tf.gather(training_set._tf_labels_var.initialized_value(), label)
                         if num_channels == 4:
                             r = resolution
-                            n = label_size #tf.size(label)
-                            c = tf.reshape(tf.tile(tf.tile(label, [tf.math.ceil(r / n)])[0:r], [r]), [r, r])
+                            #n = label_size #tf.size(label)
+                            n = 1
+                            c = tf.reshape(tf.tile(tf.tile(label / label_size, [tf.math.ceil(r / n)])[0:r], [r]), [r, r])
                             img = tf.concat([img, [c]], axis=0)
-                        label = tf.one_hot(label, 1000)
+                        label = tf.one_hot(label[0], 1000)
                     return img, label
                 dset = dset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
             else:
