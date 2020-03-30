@@ -135,6 +135,8 @@ def _decode_and_center_crop(image_bytes, image_size, crop_padding=None):
   else:
     if crop_padding is None and 'CROP_PADDING' in os.environ:
       crop_padding = int(os.environ['CROP_PADDING'])
+    if crop_padding is None:
+      crop_padding = 32
     return _decode_and_center_crop_image(image_bytes, image_size, crop_padding=crop_padding)
 
 def _flip(image):
