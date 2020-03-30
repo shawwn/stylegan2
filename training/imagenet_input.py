@@ -133,7 +133,7 @@ def _decode_and_center_crop(image_bytes, image_size, crop_padding=None):
     image = tf.image.resize_area([image], [image_size, image_size])[0]
     return image
   else:
-    if crop_padding is None as 'CROP_PADDING' in os.environ:
+    if crop_padding is None and 'CROP_PADDING' in os.environ:
       crop_padding = int(os.environ['CROP_PADDING'])
     return _decode_and_center_crop_image(image_bytes, image_size, crop_padding=crop_padding)
 
