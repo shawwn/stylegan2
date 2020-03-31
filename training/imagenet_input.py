@@ -618,13 +618,18 @@ class ImageNetInput(ImageNetTFExampleInput):
       return tf.data.Dataset.range(1).repeat().map(self._get_null_input)
 
     # Shuffle the filenames to ensure better randomization.
-    #file_pattern = os.path.join(self.data_dir, 'train-*' if self.is_training else 'validation-*')
-    file_pattern = self.data_dir
+    file_patterns = [x.strip() for x in self.data_dir.split(',') if len(x.strip()) > 0]
 
     # For multi-host training, we want each hosts to always process the same
     # subset of files.  Each host only sees a subset of the entire dataset,
     # allowing us to cache larger datasets in memory.
-    dataset = tf.data.Dataset.list_files(file_pattern, shuffle=False)
+    dataset = None
+    for pattern in file_patterns:
+      x = tf.data.Dataset.list_files(pattern, shuffle=False)
+      if dataset is None:
+        dataset = x
+      else:
+        dataset = dataset.concatenate(x)
     dataset = dataset.shard(num_hosts, index)
 
     if self.is_training and not self.cache:
