@@ -108,7 +108,9 @@ def _decode_and_random_crop(image_bytes, image_size):
 
 def _decode_and_center_crop_image(image_bytes, image_size, crop_padding=32):
   """Crops to center of image with padding then scales image_size."""
-  shape = tf.image.extract_jpeg_shape(image_bytes)
+  img = tf.io.decode_image(image_bytes)
+  shape = tf.shape(img)
+  #shape = tf.image.extract_jpeg_shape(image_bytes)
   image_height = shape[0]
   image_width = shape[1]
 
@@ -119,10 +121,11 @@ def _decode_and_center_crop_image(image_bytes, image_size, crop_padding=32):
 
   offset_height = ((image_height - padded_center_crop_size) + 1) // 2
   offset_width = ((image_width - padded_center_crop_size) + 1) // 2
-  crop_window = tf.stack([offset_height, offset_width,
-                          padded_center_crop_size, padded_center_crop_size])
-  image = tf.image.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
-  image = tf.image.resize_area([image], [image_size, image_size])[0]
+  if 'RANDOM_CROP' in os.environ:
+    image = tf.image.random_crop(img, [padded_center_crop_size, padded_center_crop_size, 3])
+  else:
+    image = tf.image.crop_to_bounding_box(img, offset_height, offset_width, padded_center_crop_size, padded_center_crop_size)
+  image = tf.image.resize_area(image, [image_size, image_size])
 
   return image
 
