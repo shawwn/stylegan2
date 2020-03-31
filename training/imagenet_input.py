@@ -115,19 +115,6 @@ def _decode_and_center_crop_image(image_bytes, image_size, crop_padding=32):
   image_width = shape[1]
   channels = shape[2]
 
-  image = tf.cond(
-        channels > 1 and channels < 3,
-        # what should we even do for an image with two channels? Just take the first channel and treat it as greyscale.
-        lambda: tf.transpose(tf.identity([tf.transpose(image, [2, 0, 1])[0]]), [1, 2, 0]),
-        lambda: image)
-
-  image = tf.cond(
-        channels < 2,
-        lambda: tf.image.grayscale_to_rgb(image),
-        lambda: image)
-
-  channels = 3
-
   padded_center_crop_size = tf.cast(
       ((image_size / (image_size + crop_padding)) *
        tf.cast(tf.minimum(image_height, image_width), tf.float32)),
@@ -140,6 +127,14 @@ def _decode_and_center_crop_image(image_bytes, image_size, crop_padding=32):
   else:
     image = tf.image.crop_to_bounding_box(image, offset_height, offset_width, padded_center_crop_size, padded_center_crop_size)
   image = tf.image.resize_area([image], [image_size, image_size])[0]
+
+  image = tf.cond(
+        channels > 1 and channels < 3,
+        # what should we even do for an image with two channels? Just take the first channel and treat it as greyscale.
+        lambda: tf.image.grayscale_to_rgb(tf.transpose(tf.identity([tf.transpose(image, [2, 0, 1])[0]]), [1, 2, 0])),
+        lambda: tf.cond(channels < 2,
+          lambda: tf.image.grayscale_to_rgb(image),
+          lambda: image))
 
   return image
 
