@@ -113,7 +113,7 @@ def _decode_and_center_crop_image(image_bytes, image_size, crop_padding=32):
   #shape = tf.image.extract_jpeg_shape(image_bytes)
   image_height = shape[0]
   image_width = shape[1]
-  channels = shape[3]
+  channels = shape[2]
 
   padded_center_crop_size = tf.cast(
       ((image_size / (image_size + crop_padding)) *
