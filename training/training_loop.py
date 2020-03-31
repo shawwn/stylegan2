@@ -305,9 +305,12 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
         resolution = training_set.shape[1]
         resolution_log2 = int(np.log2(resolution))
         label_size = training_set.label_size
-        assert gfile.IsDirectory(training_set.tfrecord_dir)
-        tfr_files = sorted(tf.io.gfile.glob(os.path.join(training_set.tfrecord_dir, '*-r%02d.tfrecords' % resolution_log2)))
-        assert len(tfr_files) == 1
+
+        def get_tfrecord_files(tfrecord_dir):
+            assert gfile.IsDirectory(tfrecord_dir)
+            tfr_files = sorted(tf.io.gfile.glob(os.path.join(tfrecord_dir, '*-r%02d.tfrecords' % resolution_log2)))
+            assert len(tfr_files) == 1
+            return tfr_files
 
         lod_index = -1
         for tfr_file, tfr_shape, tfr_lod in training_set.tfr:
@@ -354,6 +357,18 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                 else:
                     current_host = 0
                     num_hosts = 1
+            def load_stylegan_tfrecord(tfr_files):
+                dset = tf.data.Dataset.from_tensor_slices(tfr_files)
+                dset = dset.apply(tf.data.experimental.parallel_interleave(tf.data.TFRecordDataset, cycle_length=4, sloppy=True))
+                if training_set.label_file is not None:
+                    training_set._tf_labels_var, training_set._tf_labels_init = tflib.create_var_with_large_initial_value2(training_set._np_labels, name='labels_var', trainable=False)
+                    with tf.control_dependencies([training_set._tf_labels_init]):
+                        training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._tf_labels_var)
+                else:
+                    training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._np_labels)
+                dset = dset.map(dataset.TFRecordDataset.parse_tfrecord_tf, num_parallel_calls=2)
+                dset = tf.data.Dataset.zip((dset, training_set._tf_labels_dataset))
+                return dset
             if 'IMAGENET_DATASET' in os.environ:
                 dset = imagenet_dataset(os.environ['IMAGENET_DATASET'], resize=resolution, current_host=current_host, num_hosts=num_hosts)
             elif 'IMAGENET_TFRECORD_DATASET' in os.environ:
@@ -376,7 +391,14 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                 iparams = dict(params)
                 iparams['batch_size'] = 1
                 dset = ini.input_fn(iparams)
-                print('Using imagenet dataset %s (host %d / %d) channels=%d label_size=%d' % (path, current_host, num_hosts, num_channels, label_size))
+                print('Using imagenet dataset(s) %s (host %d / %d) channels=%d label_size=%d' % (path, current_host, num_hosts, num_channels, label_size))
+                if 'STYLEGAN_TFRECORD_DATASET' in os.environ:
+                    sgpaths = os.environ['STYLEGAN_TFRECORD_DATASET']
+                    paths = [x.strip() for x in sgpaths.split(',') if len(x.strip()) > 0]
+                    for path in paths:
+                        tfr_files = get_tfrecord_file(path)
+                        dset = dset.concatenate(load_stylegan_tfrecord(tfr_files))
+                    print('Using stylegan dataset(s) %s (host %d / %d) channels=%d label_size=%d' % (sgpaths, current_host, num_hosts, num_channels, label_size))
                 def parse_image(img, label):
                     img = tf.transpose(img, [0, 3, 1, 2])[0]
                     if 'IMAGENET_UNCONDITIONAL' in os.environ:
@@ -400,18 +422,8 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                     return img, label
                 dset = dset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
             else:
-                dset = tf.data.Dataset.from_tensor_slices(tfr_files)
-                dset = dset.apply(tf.data.experimental.parallel_interleave(tf.data.TFRecordDataset, cycle_length=4, sloppy=True))
-
-                if training_set.label_file is not None:
-                    training_set._tf_labels_var, training_set._tf_labels_init = tflib.create_var_with_large_initial_value2(training_set._np_labels, name='labels_var', trainable=False)
-                    with tf.control_dependencies([training_set._tf_labels_init]):
-                        training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._tf_labels_var)
-                else:
-                    training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._np_labels)
-
-                dset = dset.map(dataset.TFRecordDataset.parse_tfrecord_tf, num_parallel_calls=2)
-                dset = tf.data.Dataset.zip((dset, training_set._tf_labels_dataset))
+                tfr_files = get_tfrecord_file(training_set.tfrecord_dir)
+                dset = load_stylegan_tfrecord(tfr_files)
 
             shuffle_mb = 4096  # Shuffle data within specified window (megabytes), 0 = disable shuffling.
             prefetch_mb = 2048  # Amount of data to prefetch (megabytes), 0 = disable prefetching.
