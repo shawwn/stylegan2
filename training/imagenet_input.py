@@ -108,7 +108,7 @@ def _decode_and_random_crop(image_bytes, image_size):
 
 def _decode_and_center_crop_image(image_bytes, image_size, crop_padding=32):
   """Crops to center of image with padding then scales image_size."""
-  image = tf.io.decode_image(image_bytes)
+  image = tf.io.decode_image(image_bytes, channels=3)
   shape = tf.shape(image)
   #shape = tf.image.extract_jpeg_shape(image_bytes)
   image_height = shape[0]
@@ -127,14 +127,6 @@ def _decode_and_center_crop_image(image_bytes, image_size, crop_padding=32):
   else:
     image = tf.image.crop_to_bounding_box(image, offset_height, offset_width, padded_center_crop_size, padded_center_crop_size)
   image = tf.image.resize_area([image], [image_size, image_size])[0]
-
-  image = tf.cond(
-        channels > 1 and channels < 3,
-        # what should we even do for an image with two channels? Just take the first channel and treat it as greyscale.
-        lambda: tf.image.grayscale_to_rgb(tf.transpose(tf.identity([tf.transpose(image, [2, 0, 1])[0]]), [1, 2, 0])),
-        lambda: tf.cond(channels < 2,
-          lambda: tf.image.grayscale_to_rgb(image),
-          lambda: image))
 
   return image
 
@@ -405,7 +397,7 @@ class ImageNetTFExampleInput(object):
 
     parsed = tf.parse_single_example(value, keys_to_features)
     image_bytes = tf.reshape(parsed['image/encoded'], shape=[])
-    image_bytes = tf.io.decode_image(image_bytes, 3)
+    image_bytes = tf.io.decode_image(image_bytes, channels=3)
 
     # Subtract one so that labels are in [0, 1000).
     bias = int(os.environ['LABEL_BIAS']) if 'LABEL_BIAS' in os.environ else 0
