@@ -129,7 +129,7 @@ def _decode_and_center_crop_image(image_bytes, image_size, crop_padding=32):
   image = tf.image.resize_area([image], [image_size, image_size])[0]
   image = tf.cond(
         channels < 3,
-        lambda: tf.concat([image, image, image], axis=2),
+        lambda: tf.squeeze(tf.stack([image, image, image], axis=2)),
         lambda: image)
 
   return image
