@@ -128,7 +128,7 @@ def _decode_and_center_crop_image(image_bytes, image_size, crop_padding=32):
     image = tf.image.crop_to_bounding_box(img, offset_height, offset_width, padded_center_crop_size, padded_center_crop_size)
   image = tf.image.resize_area([image], [image_size, image_size])[0]
   image = tf.cond(
-        channels == 1,
+        channels < 3,
         lambda: tf.concat([image, image, image], axis=2),
         lambda: image)
 
