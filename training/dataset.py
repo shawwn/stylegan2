@@ -199,6 +199,12 @@ class TFRecordDataset:
         data = tf.decode_raw(features['data'], tf.uint8)
         return tf.reshape(data, features['shape'])
 
+    # Parse individual image from a tfrecords file into TensorFlow expression.
+    @staticmethod
+    def parse_tfrecord_tf_float(record):
+        img = TFRecordDataset.parse_tfrecord_tf(record)
+        return tf.cast(img, dtype=tf.float32)
+
     # Parse individual image from a tfrecords file into NumPy array.
     @staticmethod
     def parse_tfrecord_np(record):

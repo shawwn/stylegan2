@@ -357,7 +357,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                 else:
                     current_host = 0
                     num_hosts = 1
-            def load_stylegan_tfrecord(tfr_files):
+            def load_stylegan_tfrecord(tfr_files, to_float=False):
                 dset = tf.data.Dataset.from_tensor_slices(tfr_files)
                 dset = dset.apply(tf.data.experimental.parallel_interleave(tf.data.TFRecordDataset, cycle_length=4, sloppy=True))
                 if training_set.label_file is not None:
@@ -366,7 +366,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                         training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._tf_labels_var)
                 else:
                     training_set._tf_labels_dataset = tf.data.Dataset.from_tensor_slices(training_set._np_labels)
-                dset = dset.map(dataset.TFRecordDataset.parse_tfrecord_tf, num_parallel_calls=2)
+                dset = dset.map(dataset.TFRecordDataset.parse_tfrecord_tf_float if to_float else dataset.TFRecordDataset.parse_tfrecord_tf, num_parallel_calls=2)
                 dset = tf.data.Dataset.zip((dset, training_set._tf_labels_dataset))
                 return dset
             if 'IMAGENET_DATASET' in os.environ:
@@ -411,7 +411,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                             c = tf.reshape(tf.tile(tf.tile(label / label_size, [tf.math.ceil(r / n)])[0:r], [r]), [r, r])
                             img = tf.concat([img, [c]], axis=0)
                         label = tf.one_hot(label[0], 1000)
-                    return tf.cast(img, tf.float32), label
+                    return img, label
                 dset = dset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
                 print('Using imagenet dataset(s) %s (host %d / %d) channels=%d label_size=%d' % (path, current_host, num_hosts, num_channels, label_size))
                 if 'STYLEGAN_TFRECORD_DATASET' in os.environ:
@@ -419,7 +419,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                     paths = [x.strip() for x in sgpaths.split(',') if len(x.strip()) > 0]
                     for path in paths:
                         tfr_files = get_tfrecord_files(path)
-                        dset = dset.concatenate(load_stylegan_tfrecord(tfr_files))
+                        dset = dset.concatenate(load_stylegan_tfrecord(tfr_files, to_float=True))
                     print('Using stylegan dataset(s) %s (host %d / %d) channels=%d label_size=%d' % (sgpaths, current_host, num_hosts, num_channels, label_size))
             else:
                 tfr_files = get_tfrecord_files(training_set.tfrecord_dir)
