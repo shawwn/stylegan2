@@ -411,7 +411,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                             c = tf.reshape(tf.tile(tf.tile(label / label_size, [tf.math.ceil(r / n)])[0:r], [r]), [r, r])
                             img = tf.concat([img, [c]], axis=0)
                         label = tf.one_hot(label[0], 1000)
-                    return img, label
+                    return tf.cast(img, tf.float32), label
                 dset = dset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
                 print('Using imagenet dataset(s) %s (host %d / %d) channels=%d label_size=%d' % (path, current_host, num_hosts, num_channels, label_size))
                 if 'STYLEGAN_TFRECORD_DATASET' in os.environ:
