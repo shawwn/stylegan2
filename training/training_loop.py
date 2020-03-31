@@ -396,7 +396,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                     sgpaths = os.environ['STYLEGAN_TFRECORD_DATASET']
                     paths = [x.strip() for x in sgpaths.split(',') if len(x.strip()) > 0]
                     for path in paths:
-                        tfr_files = get_tfrecord_file(path)
+                        tfr_files = get_tfrecord_files(path)
                         dset = dset.concatenate(load_stylegan_tfrecord(tfr_files))
                     print('Using stylegan dataset(s) %s (host %d / %d) channels=%d label_size=%d' % (sgpaths, current_host, num_hosts, num_channels, label_size))
                 def parse_image(img, label):
@@ -422,7 +422,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                     return img, label
                 dset = dset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
             else:
-                tfr_files = get_tfrecord_file(training_set.tfrecord_dir)
+                tfr_files = get_tfrecord_files(training_set.tfrecord_dir)
                 dset = load_stylegan_tfrecord(tfr_files)
 
             shuffle_mb = 4096  # Shuffle data within specified window (megabytes), 0 = disable shuffling.
