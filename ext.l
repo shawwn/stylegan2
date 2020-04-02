@@ -119,7 +119,7 @@
 (from training.networks_stylegan2 import *)
 (from training import misc)
 
-;(me.init)
+(me.init)
 
 (defvar G (tflib.Network "G" num_channels: 3 resolution: 512 label_size: 0 func_name: "training.networks_stylegan2.G_main"))
 (defvar Gs (G.clone "Gs"))
