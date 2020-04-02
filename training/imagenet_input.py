@@ -133,7 +133,6 @@ def _decode_and_center_crop_image(image_bytes, image_size, crop_padding=32):
 def _decode_and_center_crop(image_bytes, image_size, crop_padding=None):
   if 'NO_CENTER_CROP' in os.environ:
     image = tf.io.decode_image(image_bytes, channels=3)
-    image = tf.image.central_crop(image, 1.0)
     image = tf.image.resize_area([image], [image_size, image_size])[0]
     return image
   else:
@@ -201,7 +200,7 @@ def preprocess_image(image_bytes,
   Returns:
     A preprocessed image `Tensor` with value range of [0, 255].
   """
-  if is_training:
+  if is_training and False: # a bit of a weird hack; we override the training pipeline in the eval functions.
     img = preprocess_for_train(image_bytes, use_bfloat16, image_size)
   else:
     img = preprocess_for_eval(image_bytes, use_bfloat16, image_size)
