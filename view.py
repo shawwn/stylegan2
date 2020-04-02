@@ -121,7 +121,7 @@ def get_grid_size(n):
     i += 1
   return (gw, gh)
 
-def gen_images(latents, outfile=None, display=False, labels=None, randomize_noise=False, is_validation=True, network=None):
+def gen_images(latents, outfile=None, display=False, labels=None, randomize_noise=False, is_validation=True, network=None, numpy=False):
   if network is None:
     network = Gs
   n = latents.shape[0]
@@ -141,7 +141,7 @@ def gen_images(latents, outfile=None, display=False, labels=None, randomize_nois
       f = BytesIO()
       img.save(f, 'png')
       IPython.display.display(IPython.display.Image(data=f.getvalue()))
-  return img
+  return result if numpy else img
 
 
 def grab(name, postfix, i, n=1, latents=None, **kwargs):
@@ -207,7 +207,7 @@ for ckpt in tf.train.checkpoints_iterator(model_dir, 1.0):
     seed = np.random.randint(10000)
     for i in range(seed,seed + count):
       print('------- %d -------' % i)
-      result, final = grab_grid(i, n=n, labels=labels)
+      result = grab_grid(i, n=n, labels=labels, numpy=True)
       print(final)
       post_picture(channel, misc.create_image_grid(result, get_grid_size(n)), "`" + ckpt + ' seed %d`' % i)
 
