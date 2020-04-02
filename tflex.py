@@ -314,7 +314,8 @@ def print_backtrace():
 class Session(tf.Session):
   def __init__(self, target='auto', graph=None, config=None, init_tpu=False, id=None):
     if config is None:
-      config = tf.ConfigProto(operation_timeout_in_ms=10 * 60 * 1000,
+      timeout_in_ms = int(os.environ['TIMEOUT_IN_MS']) if 'TIMEOUT_IN_MS' in os.environ else 10 * 60 * 1000
+      config = tf.ConfigProto(operation_timeout_in_ms=timeout_in_ms,
                               graph_options=tf.GraphOptions(
                                 rewrite_options=rewriter_config_pb2.RewriterConfig(
                                   disable_meta_optimizer=True)),
