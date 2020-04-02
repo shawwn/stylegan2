@@ -73,7 +73,7 @@ class Network:
         var_global_to_local: Mapping from variable global names to local names.
     """
 
-    def __init__(self, name: str = None, func_name: Any = None, reset_own_vars = False, **static_kwargs):
+    def __init__(self, name: str = None, scope: str = None, func_name: Any = None, reset_own_vars = False, **static_kwargs):
         tfutil.assert_tf_initialized()
         assert isinstance(name, str) or name is None
         assert func_name is not None
@@ -82,6 +82,7 @@ class Network:
 
         self._init_fields()
         self.name = name
+        self.scope = scope
         self.static_kwargs = util.EasyDict(static_kwargs)
 
         # Locate the user-specified network build function.
@@ -154,8 +155,9 @@ class Network:
         if self.name is None:
             self.name = self._build_func_name
         assert re.match("^[A-Za-z0-9_.\\-]*$", self.name)
-        with tf.name_scope(None):
-            self.scope = tf.get_default_graph().unique_name(self.name, mark_as_used=True)
+        if self.scope is None:
+            with tf.name_scope(None):
+                self.scope = tf.get_default_graph().unique_name(self.name, mark_as_used=True)
 
         # Finalize build func kwargs.
         build_kwargs = dict(self.static_kwargs)
