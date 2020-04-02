@@ -289,6 +289,7 @@ def gen_images(latents, outfile=None, display=False, labels=None, randomize_nois
       IPython.display.display(IPython.display.Image(data=f.getvalue()))
   return result
 
+import discord
 import tensorflow as tf
 grid_size = [1,1]
 image_shrink = 1
