@@ -45,20 +45,11 @@
       (let y (f x)
         (if y (return y))))))
 
-
 (def saveable-vars (network)
   (map (fn ((k v)) (list (cat "G_synthesis/" k) v))
        (list x for x in (synthesis.trainables.items))))
 
-
 ;(go (chan*.send "hi" file: (image-to-discord-file img)))
-
-;(async def ex (form)
-;  (let (result (await (repl-print form))
-;        result (if (image? result) result error-image*)
-;        ;result (result.resize '(256 256)))
-;        )
-;    (chan*.send "hi" file: 
 
 (import tflex)
 
@@ -321,11 +312,22 @@ all_latents = scipy.ndimage.gaussian_filter(all_latents,
                 [smoothing_sec * mp4_fps] + [0] * len(Gs.input_shape), mode='wrap')
 all_latents /= np.sqrt(np.mean(np.square(all_latents)))
 
+
+def rand_latent(n, seed=None):
+  if seed is not None:
+    if seed < 0:
+      seed = 2*32 - seed
+    np.random.seed(seed)
+  result = np.random.randn(n, *G.input_shape[1:])
+  if seed is not None:
+    np.random.seed()
+  return result
+
+sched = dnnlib.EasyDict()
+sched.minibatch_gpu = 1
+
+
 | 
 
 nil
-;(primg (hd (Gs.run all_z nil)))
-;(primg img)
-
-;(primg (misc.convert_to_pil_image qq.0 '(-1 1)))
 
