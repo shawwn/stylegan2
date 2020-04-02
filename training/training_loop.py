@@ -387,7 +387,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                 num_channels = int(os.environ["NUM_CHANNELS"]) if "NUM_CHANNELS" in os.environ else 3
                 assert num_channels == 3 or num_channels == 4
                 path = os.environ['IMAGENET_TFRECORD_DATASET']
-                ini = imagenet_input.ImageNetInput(path, is_training=False, image_size=resolution, num_cores=num_hosts)
+                ini = imagenet_input.ImageNetInput(path, is_training=True, image_size=resolution, num_cores=num_hosts)
                 iparams = dict(params)
                 iparams['batch_size'] = 1
                 dset = ini.input_fn(iparams)

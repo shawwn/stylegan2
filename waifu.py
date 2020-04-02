@@ -106,6 +106,8 @@ def init(session=None, num_channels=None, resolution=None, label_size=None):
   return session
 
 def load_checkpoint(path, session=None, var_list=None):
+  if var_list is None:
+    var_list = tflex.Gs.trainables
   ckpt = tf.train.latest_checkpoint(path) or path
   assert ckpt is not None
   print('Loading checkpoint ' + ckpt)

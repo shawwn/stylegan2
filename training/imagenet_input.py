@@ -629,7 +629,12 @@ class ImageNetInput(ImageNetTFExampleInput):
     dataset = dataset.shard(num_hosts, index)
 
     if self.is_training and not self.cache:
-      dataset = dataset.repeat()
+      # We shuffle only during training, and during training, we must produce an
+      # infinite dataset, so apply the fused shuffle_and_repeat optimized
+      # dataset transformation.
+      dataset = dataset.apply(
+        tf.contrib.data.shuffle_and_repeat(1024 * 16))
+      #dataset = dataset.repeat()
 
     def fetch_dataset(filename):
       buffer_size = 8 * 1024 * 1024  # 8 MiB per file
