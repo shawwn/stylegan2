@@ -117,7 +117,9 @@ def load_checkpoint(path, session=None, var_list=None):
 
 #tflex.state.noisy = False
 
-#load_checkpoint(model_dir)
+init()
+
+load_checkpoint(model_dir)
 
 import PIL.Image
 import numpy as np
