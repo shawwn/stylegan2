@@ -10,7 +10,7 @@ label_size = int(os.environ['LABEL_SIZE'])
 resolution = int(os.environ['RESOLUTION'])
 num_channels = int(os.environ['NUM_CHANNELS'])
 model_dir = os.environ['MODEL_DIR']
-channel = os.environ['CHANNEL']
+channel = os.environ['CHANNEL'] if 'CHANNEL' in os.environ else 'chaos'
 count = int(os.environ['COUNT']) if 'COUNT' in os.environ else 1
 discord_token = os.environ['DISCORD_TOKEN']
 grid_image_size = int(os.environ['GRID_SIZE']) if 'GRID_SIZE' in os.environ else 9
@@ -121,7 +121,7 @@ def get_grid_size(n):
     i += 1
   return (gw, gh)
 
-def gen_images(latents, outfile='test.png', display=False, labels=None, randomize_noise=False, is_validation=True, network=None):
+def gen_images(latents, outfile=None, display=False, labels=None, randomize_noise=False, is_validation=True, network=None):
   if network is None:
     network = Gs
   n = latents.shape[0]
@@ -129,10 +129,10 @@ def gen_images(latents, outfile='test.png', display=False, labels=None, randomiz
   drange_net = [-1, 1]
   with tflex.device('/gpu:0'):
     result = network.run(latents, labels, is_validation=is_validation, randomize_noise=randomize_noise, minibatch_size=sched.minibatch_gpu)
-    if result.shape[1] > 3:
-      final = result[:, 3, :, :]
-    else:
-      final = None
+    #if result.shape[1] > 3:
+    #  final = result[:, 3, :, :]
+    #else:
+    #  final = None
     result = result[:, 0:3, :, :]
     img = misc.convert_to_pil_image(misc.create_image_grid(result, grid_size), drange_net)
     if outfile is not None:
@@ -141,7 +141,7 @@ def gen_images(latents, outfile='test.png', display=False, labels=None, randomiz
       f = BytesIO()
       img.save(f, 'png')
       IPython.display.display(IPython.display.Image(data=f.getvalue()))
-  return result, final
+  return img
 
 
 def grab(name, postfix, i, n=1, latents=None, **kwargs):
