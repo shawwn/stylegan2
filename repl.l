@@ -20,7 +20,7 @@
 ;(import ganlib)
 (from encoder.generator_model import Generator)
 (from encoder.perceptual_model import PerceptualModel load_images)
-(from keras.models import load_model)
+;(from keras.models import load_model)
 (from importlib import reload)
 
 ;(import matplotlib.pyplot as plt)
