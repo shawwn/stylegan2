@@ -208,7 +208,6 @@ for ckpt in tf.train.checkpoints_iterator(model_dir, 1.0):
     for i in range(seed,seed + count):
       print('------- %d -------' % i)
       result = grab_grid(i, n=n, labels=labels, numpy=True)
-      print(final)
       post_picture(channel, misc.create_image_grid(result, get_grid_size(n)), "`" + ckpt + ' seed %d`' % i)
 
 
