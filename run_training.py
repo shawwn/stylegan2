@@ -70,7 +70,6 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
 
     desc += '-' + dataset
     resolution = int(os.environ['RESOLUTION']) if 'RESOLUTION' in os.environ else 64
-    fmap_base = (int(os.environ['FMAP_BASE']) if 'FMAP_BASE' in os.environ else 16) << 10
     dataset_args = EasyDict(tfrecord_dir=dataset, resolution=resolution)
 
     assert num_gpus in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192]
@@ -83,6 +82,12 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
     # Configs A-E: Shrink networks to match original StyleGAN.
     if config_id != 'config-f':
         G.fmap_base = D.fmap_base = 8 << 10
+
+    if 'FMAP_BASE' in os.environ:
+      G.fmap_base = D.fmap_base = int(os.environ['FMAP_BASE']) << 10
+
+    print('G_fmap_base: %d' % G.fmap_base)
+    print('D_fmap_base: %d' % D.fmap_base)
 
     # Config E: Set gamma to 100 and override G & D architecture.
     if config_id.startswith('config-e'):
