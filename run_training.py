@@ -85,6 +85,8 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
 
     if 'FMAP_BASE' in os.environ:
       G.fmap_base = D.fmap_base = int(os.environ['FMAP_BASE']) << 10
+    else:
+      G.fmap_base = D.fmap_base = 16 << 10 # default
 
     print('G_fmap_base: %d' % G.fmap_base)
     print('D_fmap_base: %d' % D.fmap_base)
