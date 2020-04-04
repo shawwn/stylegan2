@@ -65,7 +65,9 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
     desc = 'stylegan2'
 
     desc += '-' + dataset
-    dataset_args = EasyDict(tfrecord_dir=dataset, resolution=int(os.environ['RESOLUTION']) if 'RESOLUTION' in os.environ else 64)
+    resolution = int(os.environ['RESOLUTION']) if 'RESOLUTION' in os.environ else 64
+    fmap_base = (int(os.environ['FMAP_BASE']) if 'FMAP_BASE' in os.environ else 16) << 10
+    dataset_args = EasyDict(tfrecord_dir=dataset, resolution=resolution)
 
     assert num_gpus in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192]
     sc.num_gpus = num_gpus
