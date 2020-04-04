@@ -527,14 +527,9 @@ def training_loop(
     if resume_time <= 0.0 and 'RESUME_TIME' in os.environ:
         resume_time = float(os.environ['RESUME_TIME'])
 
-    # Initialize dnnlib and TensorFlow.
-    #tflib.init_tf(tf_config)
     num_gpus = dnnlib.submit_config.num_gpus
 
     # Load training set.
-    #training_set = dataset.load_dataset(data_dir=dnnlib.convert_path(data_dir), verbose=True, **dataset_args)
-    #import pdb; pdb.set_trace()
-    #dset, input_fn = get_input_fn(training_set, num_gpus*32)
     def load_training_set(**kws):
         return dataset.load_dataset(data_dir=dnnlib.convert_path(data_dir), verbose=True, **dataset_args, **kws)
     input_fn, training_set = get_input_fn(load_training_set, num_gpus, mirror_augment=mirror_augment, drange_net=drange_net)
@@ -553,6 +548,7 @@ def training_loop(
         D_gpu = D
         reals_read = features
         labels_read = labels
+
         minibatch_gpu_in = params['batch_size']
         G_opt_args = dict(G_opt_args)
         D_opt_args = dict(D_opt_args)
@@ -568,10 +564,6 @@ def training_loop(
                                                           labels=labels_read, **D_loss_args)
 
         # Register gradients.
-        #G_reg_interval = tf.constant(G_reg_interval, tf.int64)
-        #D_reg_interval = tf.constant(D_reg_interval, tf.int64)
-        #zero = tf.constant(0, tf.int64)
-        #one = tf.constant(1, tf.int64)
         G_reg_opt = tflib.Optimizer(name='RegG', share=G_opt, cross_shard=True, learning_rate=sched_args['G_lrate_base'], **G_opt_args)
         D_reg_opt = tflib.Optimizer(name='RegD', share=D_opt, cross_shard=True, learning_rate=sched_args['D_lrate_base'], **D_opt_args)
         if not lazy_regularization:
@@ -618,16 +610,11 @@ def training_loop(
                 def D_else():
                     with tf.control_dependencies([tf.train.get_or_create_global_step()]):
                         return tf.no_op()
-                #G_reg_train_op = tf.cond(lambda: tf.equal(tf.cast(tf.mod(tf.cast(tf.train.get_or_create_global_step(), tf.int32), tf.cast(G_reg_interval, tf.int32)), tf.int32), tf.constant(0, tf.int32)), G_fn, G_else)
-                #D_reg_train_op = tf.cond(lambda: tf.equal(tf.cast(tf.mod(tf.cast(tf.train.get_or_create_global_step(), tf.int32), tf.cast(D_reg_interval, tf.int32)), tf.int32), tf.constant(0, tf.int32)), D_fn, D_else)
                 G_reg_train_op = tf.cond(lambda: tf.equal(tf.mod(tf.train.get_or_create_global_step(), G_reg_interval), tf.constant(0, tf.int64)), G_fn, G_else)
                 D_reg_train_op = tf.cond(lambda: tf.equal(tf.mod(tf.train.get_or_create_global_step(), D_reg_interval), tf.constant(0, tf.int64)), D_fn, D_else)
         else:
             G_reg_train_op = G_reg_opt._shared_optimizers[''].minimize(G_reg_loss, var_list=G_gpu.trainables) if G_reg_loss is not None else tf.no_op()
             D_reg_train_op = D_reg_opt._shared_optimizers[''].minimize(D_reg_loss, var_list=D_gpu.trainables) if D_reg_loss is not None else tf.no_op()
-
-        #run_G_reg = (lazy_regularization and running_mb_counter % G_reg_interval == 0)
-        #run_D_reg = (lazy_regularization and running_mb_counter % D_reg_interval == 0)
 
         minibatch_size_in = batch_size
         Gs_beta              = 0.5 ** tf.div(tf.cast(minibatch_size_in, tf.float32), G_smoothing_kimg * 1000.0) if G_smoothing_kimg > 0.0 else 0.0
@@ -640,31 +627,25 @@ def training_loop(
                 with tf.control_dependencies([G_reg_train_op]):
                     with tf.control_dependencies([D_train_op]):
                         with tf.control_dependencies([D_reg_train_op]):
-                            train_op = tf.group(Gs_update_op, name='train_op')
-        #import pdb; pdb.set_trace()
-
-        #train_op = G_opt.minimize(G_loss, global_step=tf.train.get_or_create_global_step())
+                            with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+                                train_op = tf.group(Gs_update_op, name='train_op')
         return tf.contrib.tpu.TPUEstimatorSpec(
             mode=mode,
             loss=loss,
             train_op=train_op)
-
-        #import pdb; pdb.set_trace()
 
     use_tpu = True
     training_steps = 2048*20480
     batch_size = sched_args.minibatch_size_base
     pprint(sched_args)
     model_dir=os.environ['MODEL_DIR'] if 'MODEL_DIR' in os.environ else 'gs://danbooru-euw4a/test/run30/'
-    #if tf.gfile.Exists(model_dir):
-    #  tf.gfile.DeleteRecursively(model_dir)
     tpu_cluster_resolver = tflex.get_tpu_resolver()
     run_config = tf.contrib.tpu.RunConfig(
         model_dir=model_dir,
         #save_checkpoints_steps=100,
         save_checkpoints_secs=600//5,
         keep_checkpoint_max=10,
-        keep_checkpoint_every_n_hours=2,
+        keep_checkpoint_every_n_hours=1,
         cluster=tpu_cluster_resolver,
         tpu_config=tf.contrib.tpu.TPUConfig(iterations_per_loop=256))
     estimator = tf.contrib.tpu.TPUEstimator(
@@ -672,7 +653,6 @@ def training_loop(
         use_tpu=use_tpu,
         model_fn=model_fn,
         train_batch_size=batch_size)
-    #import pdb; pdb.set_trace()
     print('Training...')
     estimator.train(input_fn, steps=training_steps)
     import pdb; pdb.set_trace()
