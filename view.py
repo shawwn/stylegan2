@@ -8,6 +8,7 @@ os.environ['NOISY'] = '1'
 # --- set resolution and label size here:
 label_size = int(os.environ['LABEL_SIZE'])
 resolution = int(os.environ['RESOLUTION'])
+fmap_base = (int(os.environ['FMAP_BASE']) if 'FMAP_BASE' in os.environ else 16) << 10
 num_channels = int(os.environ['NUM_CHANNELS'])
 model_dir = os.environ['MODEL_DIR']
 channel = os.environ['CHANNEL'] if 'CHANNEL' in os.environ else 'chaos'
@@ -61,11 +62,11 @@ sched.minibatch_gpu = 1
 
 if 'G' not in globals():
   with tflex.device('/gpu:0'):
-    G = tflib.Network('G', num_channels=num_channels, resolution=resolution, label_size=label_size, **G_args)
+    G = tflib.Network('G', num_channels=num_channels, resolution=resolution, label_size=label_size, fmap_base=fmap_base, **G_args)
     G.print_layers()
     Gs, Gs_finalize = G.clone2('Gs')
     Gs_finalize()
-    D = tflib.Network('D', num_channels=num_channels, resolution=resolution, label_size=label_size, **D_args)
+    D = tflib.Network('D', num_channels=num_channels, resolution=resolution, label_size=label_size, fmap_base=fmap_base, **D_args)
     D.print_layers()
 
 def rand_latent(n, seed=None):
