@@ -103,8 +103,16 @@
   (set chan (or chan chan*))
   (go (chan.send (or text "") file: f)))
 
+(def numpy-to-image-grid (result drange-net: drange-net)
+  (let (drange-net (or drange-net '(-1 1))
+        n result.shape.0
+        grid-size (get-grid-size n)
+        x (misc.create-image-grid result grid-size)
+        img (misc.convert-to-pil-image x drange-net))
+    img))
+
 (def primg (img text: text name: name)
-  (let (img (if (numpy? img) (misc.convert-to-pil-image img '(-1 1)) img)
+  (let (img (if (numpy? img) (numpy-to-image-grid img) img)
         img (if target-size* (resize-image img target-size*) img)
         f (image-to-discord-file img))
     ;(set (get f 'filename) name)
@@ -149,7 +157,7 @@
   (rand-latent (or n 9) seed: (or seed 0)))
 
 (def o (seed n)
-  (primg (gen-images (rand-latent (or n 9) (or seed 0)))))
+  (gen-images (rand-latent (or n 9) (or seed 0))))
 
 (mac see args
   (let (args (keep (fn (x) (not (= x "seed"))) args)
@@ -276,10 +284,6 @@ def gen_images(latents, outfile=None, display=False, labels=None, randomize_nois
   drange_net = [-1, 1]
   with tflex.device('/gpu:0'):
     result = network.run(latents, labels, is_validation=is_validation, randomize_noise=randomize_noise, minibatch_size=sched.minibatch_gpu)
-    if result.shape[1] > 3:
-      final = result[:, 3, :, :]
-    else:
-      final = None
     img = misc.convert_to_pil_image(misc.create_image_grid(result, grid_size), drange_net)
     if outfile is not None:
       img.save(outfile)
