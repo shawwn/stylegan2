@@ -14,6 +14,7 @@ import dnnlib.tflib as tflib
 from dnnlib.tflib.ops.upfirdn_2d import upsample_2d, downsample_2d, upsample_conv_2d, conv_downsample_2d
 from dnnlib.tflib.ops.fused_bias_act import fused_bias_act
 import functools
+from dnnlib.tflib.autosummary import autosummary
 
 # NOTE: Do not import any application-specific modules here!
 # Specify all network parameters as kwargs.
@@ -70,7 +71,7 @@ def conv2d_layer(x, fmaps, kernel, up=False, down=False, resample_kernel=None, g
 
 def apply_bias_act(x, act='linear', alpha=None, gain=None, lrmul=1, bias_var='bias'):
     b = tf.get_variable(bias_var, shape=[x.shape[1]], initializer=tf.initializers.zeros(), use_resource=True) * lrmul
-    return fused_bias_act(x, b=tf.cast(b, x.dtype), act=act, alpha=alpha, gain=gain)
+    return graph_spectral_norm(fused_bias_act(x, b=tf.cast(b, x.dtype), act=act, alpha=alpha, gain=gain))
 
 #----------------------------------------------------------------------------
 # Naive upsampling (nearest neighbor) and downsampling (average pooling).
@@ -735,7 +736,7 @@ def weight_initializer(initializer=NORMAL_INIT, stddev=0.02):
   raise ValueError("Unknown weight initializer {}.".format(initializer))
 
 #@gin.configurable(blacklist=["inputs"])
-def spectral_norm(inputs, epsilon=1e-12, singular_value="left"):
+def spectral_norm(inputs, epsilon=1e-12, singular_value="left", return_normalized=True, power_iteration_rounds=1):
   """Performs Spectral Normalization on a weight tensor.
 
   Details of why this is helpful for GAN's can be found in "Spectral
@@ -784,7 +785,6 @@ def spectral_norm(inputs, epsilon=1e-12, singular_value="left"):
   # Use power iteration method to approximate the spectral norm.
   # The authors suggest that one round of power iteration was sufficient in the
   # actual experiment to achieve satisfactory performance.
-  power_iteration_rounds = 1
   for _ in range(power_iteration_rounds):
     if singular_value == "left":
       # `v` approximates the first right singular vector of matrix `w`.
@@ -795,28 +795,31 @@ def spectral_norm(inputs, epsilon=1e-12, singular_value="left"):
       v = tf.math.l2_normalize(tf.matmul(u, w, transpose_b=True),
                                epsilon=epsilon)
       u = tf.math.l2_normalize(tf.matmul(v, w), epsilon=epsilon)
-
   # Update the approximation.
   with tf.control_dependencies([tf.assign(u_var, u, name="update_u")]):
     u = tf.identity(u)
-
   # The authors of SN-GAN chose to stop gradient propagating through u and v
   # and we maintain that option.
   u = tf.stop_gradient(u)
   v = tf.stop_gradient(v)
-
   if singular_value == "left":
     norm_value = tf.matmul(tf.matmul(tf.transpose(u), w), v)
   else:
     norm_value = tf.matmul(tf.matmul(v, w), u, transpose_b=True)
   norm_value.shape.assert_is_fully_defined()
   norm_value.shape.assert_is_compatible_with([1, 1])
+  if return_normalized:
+    w_normalized = w / norm_value
+    # Deflate normalized weights to match the unnormalized tensor.
+    w_tensor_normalized = tf.reshape(w_normalized, inputs.shape)
+    return w_tensor_normalized
+  else:
+    return w, norm_value
 
-  w_normalized = w / norm_value
-
-  # Deflate normalized weights to match the unnormalized tensor.
-  w_tensor_normalized = tf.reshape(w_normalized, inputs.shape)
-  return w_tensor_normalized
+def graph_spectral_norm(w, name=tf.get_variable_scope().name):
+    norm = spectral_norm(w, return_normalized=False)[1][0][0]
+    autosummary('specnorm/' + name, norm)
+    return w
 
 def conv2d(inputs, output_dim, k_h, k_w, d_h, d_w, stddev=0.02, name="conv2d",
            use_sn=False, use_bias=True):
