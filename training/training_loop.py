@@ -14,7 +14,7 @@ import time
 import dnnlib
 import dnnlib.tflib as tflib
 import traceback
-from dnnlib.tflib.autosummary import autosummary, get_tpu_summary
+from dnnlib.tflib.autosummary import autosummary, get_tpu_summary, set_num_replicas
 
 from training import dataset
 from training import misc
@@ -355,6 +355,7 @@ def get_input_fn(load_training_set, num_cores, mirror_augment, drange_net):
                 else:
                     current_host = 0
                     num_hosts = 1
+            set_num_replicas(params["context"].num_replicas if "context" in params else 1)
             def load_stylegan_tfrecord(tfr_files, to_float=False):
                 dset = tf.data.Dataset.from_tensor_slices(tfr_files)
                 dset = dset.apply(tf.data.experimental.parallel_interleave(tf.data.TFRecordDataset, cycle_length=4, sloppy=True))

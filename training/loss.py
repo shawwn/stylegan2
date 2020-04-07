@@ -9,7 +9,7 @@
 import numpy as np
 import tensorflow as tf
 import dnnlib.tflib as tflib
-from dnnlib.tflib.autosummary import autosummary, get_tpu_summary
+from dnnlib.tflib.autosummary import autosummary, autoimages
 
 #----------------------------------------------------------------------------
 # Logistic loss from the paper
@@ -78,8 +78,8 @@ def D_logistic_r2(G, D, opt, training_set, minibatch_size, reals, labels, gamma=
     loss = tf.nn.softplus(fake_scores_out) # -log(1-sigmoid(fake_scores_out))
     loss += tf.nn.softplus(-real_scores_out) # -log(sigmoid(real_scores_out)) # pylint: disable=invalid-unary-operand-type
 
-    get_tpu_summary().image("Loss/images/real", reals)
-    get_tpu_summary().image("Loss/images/fake", fake_images_out)
+    autoimages("Loss/images/real", reals)
+    autoimages("Loss/images/fake", fake_images_out)
 
     with tf.name_scope('GradientPenalty'):
         fake_grads = tf.gradients(tf.reduce_sum(fake_scores_out), [fake_images_out])[0]
