@@ -63,7 +63,7 @@ class TpuSummaries(object):
   all the TPU cores.
   """
 
-  def __init__(self, log_dir, save_summary_steps=250):
+  def __init__(self, log_dir, save_summary_steps=256):
     self._log_dir = log_dir
     self._entries = []
     # While False no summary entries will be added. On TPU we unroll the graph
