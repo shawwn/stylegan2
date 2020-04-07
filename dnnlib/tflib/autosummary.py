@@ -74,6 +74,20 @@ def _create_var(name: str, value_expr: TfExpression) -> TfExpression:
         _vars[name] = [var]
     return update_op
 
+import os
+from . import tpu_summaries
+
+tpu_summary = None
+
+def get_tpu_summary(model_dir=None):
+    global tpu_summary
+    if tpu_summary is None:
+        if model_dir is None:
+            model_dir = os.path.join(os.environ['MODEL_DIR'], 'autosummary')
+        tpu_summary = tpu_summaries.TpuSummaries(model_dir)
+    else:
+        assert model_dir is None
+    return tpu_summary
 
 def autosummary(name: str, value: TfExpressionEx, passthru: TfExpressionEx = None, condition: TfExpressionEx = True) -> TfExpressionEx:
     """Create a new autosummary.
@@ -92,6 +106,7 @@ def autosummary(name: str, value: TfExpressionEx, passthru: TfExpressionEx = Non
     with tf.control_dependencies([autosummary('l2loss', loss)]):
         n = tf.identity(n)
     """
+    get_tpu_summary().scalar(name, value)
     return value
     tfutil.assert_tf_initialized()
     name_id = name.replace("/", "_")

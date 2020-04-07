@@ -9,14 +9,12 @@
 import os
 import numpy as np
 import tensorflow as tf
-from tensorflow.contrib import tpu
 import tflex
-import tqdm
 import time
 import dnnlib
 import dnnlib.tflib as tflib
 import traceback
-from dnnlib.tflib.autosummary import autosummary
+from dnnlib.tflib.autosummary import autosummary, get_tpu_summary
 
 from training import dataset
 from training import misc
@@ -642,6 +640,7 @@ def training_loop(
     tpu_cluster_resolver = tflex.get_tpu_resolver()
     run_config = tf.contrib.tpu.RunConfig(
         model_dir=model_dir,
+        host_call=get_tpu_summary(os.path.join(model_dir, 'autosummaries')).get_host_call(),
         #save_checkpoints_steps=100,
         save_checkpoints_secs=600//5,
         keep_checkpoint_max=10,
