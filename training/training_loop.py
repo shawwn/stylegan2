@@ -628,10 +628,9 @@ def training_loop(
                         with tf.control_dependencies([D_reg_train_op]):
                             with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
                                 train_op = tf.group(Gs_update_op, name='train_op')
-        model_dir = os.environ['MODEL_DIR']
         return tf.contrib.tpu.TPUEstimatorSpec(
             mode=mode,
-            host_call = get_tpu_summary(os.path.join(model_dir, 'autosummaries')).get_host_call(),
+            host_call = get_tpu_summary().get_host_call(),
             loss=loss,
             train_op=train_op)
 
