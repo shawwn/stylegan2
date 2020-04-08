@@ -162,28 +162,38 @@ def autoimages(summary_name, images, grid_shape=None):
     batch_size_per_replica = images.shape[0].value
     num_replicas = get_num_replicas()
     total_num_images = batch_size_per_replica * num_replicas
-    if total_num_images >= 64:
-        grid_shape = (8, 8)
+    if callable(grid_shape):
+        grid_shape = grid_shape(total_num_images)
+    if grid_shape is None:
+        w = int(os.environ['GRID_WIDTH']) if 'GRID_WIDTH' in os.environ else 3
+        h = int(os.environ['GRID_HEIGHT']) if 'GRID_HEIGHT' in os.environ else 3
+        grid_shape = (w, h)
+    sample_num_images = np.prod(grid_shape)
+    if total_num_images >= sample_num_images:
         # This can be more than 64. We slice all_images below.
-        samples_per_replica = int(np.ceil(64 / num_replicas))
+        samples_per_replica = int(np.ceil(sample_num_images / num_replicas))
     else:
-        if callable(grid_shape):
-            grid_shape = grid_shape(total_num_images)
-        else:
-            grid_shape = (8, 8)
         samples_per_replica = batch_size_per_replica
+    res = int(os.environ['RESOLUTION']) if 'RESOLUTION' in os.environ else 64
+    num_channels = int(os.environ["NUM_CHANNELS"]) if "NUM_CHANNELS" in os.environ else 3
+    image_shape = [res, res, num_channels]
+    sample_res = int(os.environ['GRID_RESOLUTION']) if 'GRID_RESOLUTION' in os.environ else 128
+    sample_shape = [sample_res, sample_res]
+
     def _merge_images_to_grid(all_images):
-        res = int(os.environ['RESOLUTION']) if 'RESOLUTION' in os.environ else 64
-        num_channels = int(os.environ["NUM_CHANNELS"]) if "NUM_CHANNELS" in os.environ else 3
-        image_shape = [res, res, num_channels]
-        tf.logging.info("Creating images summary for %s at resolution %dx%d with channel count %d: %s", summary_name, image_shape[0], image_shape[1], image_shape[2], all_images)
+        tf.logging.info("Creating %dx%d images grid for %s at resolution %dx%d channel count %d across %d replicas: %s",
+                        grid_shape[0], grid_shape[1], summary_name, image_shape[0], image_shape[1], image_shape[2], num_replicas, all_images)
         return image_grid(
             all_images[:np.prod(grid_shape)],
             grid_shape=grid_shape,
             image_shape=image_shape[:2],
             num_channels=image_shape[2])
+    images = images[:samples_per_replica]
+    if image_shape[0] > sample_shape[0] or image_shape[1] > sample_shape[1]:
+        tf.logging.info('Downscaling sampled images from %dx%d to %dx%d', image_shape[0], image_shape[1], sample_shape[0], sample_shape[1])
+        images = tf.image.resize(images, sample_shape, method=tf.image.ResizeMethod.AREA)
     get_tpu_summary().image(summary_name,
-                            images[:samples_per_replica],
+                            images,
                             reduce_fn=_merge_images_to_grid)
 
 def autosummary(name: str, value: TfExpressionEx, passthru: TfExpressionEx = None, condition: TfExpressionEx = True) -> TfExpressionEx:
