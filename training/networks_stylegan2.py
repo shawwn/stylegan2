@@ -489,7 +489,7 @@ def G_synthesis_stylegan2(
     def torgb(x, y, res): # res = 2..resolution_log2
         with tf.variable_scope('ToRGB'):
             t = apply_bias_act(modulated_conv2d_layer(x, dlatents_in[:, res*2-3], fmaps=num_channels, kernel=1, demodulate=False, fused_modconv=fused_modconv))
-            return t if y is None else y + t
+            return graph_images(t if y is None else y + t)
 
     # Early layers.
     y = None
@@ -830,6 +830,11 @@ def graph_spectral_norm(w):
   else:
     tf.logging.info('ignoring autosummary(%s, %s)', repr(name), repr(norm))
   return w
+
+def graph_images(images):
+    images = tf.identity(images)
+    name = images.name.split(':')[0]
+    tf.logging.info('graph_images(%s, %s)', repr(name), repr(images))
 
 def conv2d(inputs, output_dim, k_h, k_w, d_h, d_w, stddev=0.02, name="conv2d",
            use_sn=False, use_bias=True):
