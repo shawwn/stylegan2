@@ -816,10 +816,13 @@ def spectral_norm(inputs, epsilon=1e-12, singular_value="left", return_normalize
   else:
     return w, norm_value
 
-def graph_spectral_norm(w, name=tf.get_variable_scope().name):
-    norm = spectral_norm(w, return_normalized=False)[1][0][0]
-    autosummary('specnorm/' + name.replace('/', '_'), norm)
-    return w
+def graph_spectral_norm(w):
+  norm = spectral_norm(w, return_normalized=False)[1][0][0]
+  name = norm.name.split(':')[0]
+  if name.startswith('D_loss/G/G_synthesis/'):
+    name = name.replace('D_loss/G/G_synthesis/', '')
+    autosummary('specnorm_' + name, norm)
+  return w
 
 def conv2d(inputs, output_dim, k_h, k_w, d_h, d_w, stddev=0.02, name="conv2d",
            use_sn=False, use_bias=True):
