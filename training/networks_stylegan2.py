@@ -822,6 +822,7 @@ def graph_spectral_norm(w):
   name = norm.name.split(':')[0]
   if name.startswith('D_loss/G/G_synthesis/'):
     name = name.replace('D_loss/G/G_synthesis/', '')
+    name = name.replace('/strided_slice_2', '')
     autosummary('specnorm_' + name, norm)
   return w
 
