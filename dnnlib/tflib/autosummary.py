@@ -194,11 +194,12 @@ def autoimages(summary_name, images, grid_shape=None, res=None):
                             image_shape[0], image_shape[1],
                             sample_shape[0], sample_shape[1])
             all_images = tf.image.resize(all_images, sample_shape[0:2], method=tf.image.ResizeMethod.AREA)
+            image_shape = sample_shape
         return image_grid(
             all_images,
             grid_shape=grid_shape,
-            image_shape=sample_shape[:2],
-            num_channels=sample_shape[2])
+            image_shape=image_shape[:2],
+            num_channels=image_shape[2])
     get_tpu_summary().image(summary_name,
                             images,
                             reduce_fn=_merge_images_to_grid)
