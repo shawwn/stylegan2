@@ -824,8 +824,8 @@ def graph_spectral_norm(w):
   if name.startswith('D_loss/G/G_synthesis/'):
     name = name.replace('D_loss/G/G_synthesis/', '')
     autosummary('specnorm_G_' + name, norm)
-  elif name.startswith('D/'):
-    name = name.replace('D/', '')
+  elif name.startswith('D_loss/D/'):
+    name = name.replace('D_loss/D/', '')
     autosummary('specnorm_D_' + name, norm)
   else:
     tf.logging.info('ignoring autosummary(%s, %s)', repr(name), repr(norm))
