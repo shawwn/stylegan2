@@ -779,6 +779,7 @@ def spectral_norm(inputs, epsilon=1e-12, singular_value="left", return_normalize
       shape=u_shape,
       dtype=w.dtype,
       initializer=tf.random_normal_initializer(),
+      collections=[tf.GraphKeys.LOCAL_VARIABLES],
       trainable=False, use_resource=True)
   u = u_var
 
