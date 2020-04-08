@@ -835,7 +835,7 @@ def graph_spectral_norm(w):
   if name is not None:
     autosummary('specnorm_' + name, value)
   else:
-    tf.logging.info('ignoring autosummary(%s, %s)', repr(name), repr(value))
+    tf.logging.info('ignoring autosummary(%s, %s)', repr(value.name), repr(value))
   if 'USE_SPECNORM' in os.environ:
     tf.logging.info('Using spectral normalization for %s', repr(w))
     w_normalized = w1 / norm
