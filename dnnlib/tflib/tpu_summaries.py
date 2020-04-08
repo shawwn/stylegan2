@@ -45,6 +45,7 @@ import collections
 
 from absl import logging
 import tensorflow as tf
+from . import tfutil
 
 
 summary = tf.contrib.summary  # TensorFlow Summary API v2.
@@ -75,18 +76,23 @@ class TpuSummaries(object):
     """Add a summary for images. Tensor must be of 4-D tensor."""
     if not self.record:
       return
-    self._entries.append(
-        TpuSummaryEntry(summary.image, name, tensor, reduce_fn))
+    name_id = name.replace("/", "_")
+    with tfutil.absolute_name_scope("Autosummary/" + name_id):
+      tensor = tf.convert_to_tensor(tensor)
+      self._entries.append(
+          TpuSummaryEntry(summary.image, name, tensor, reduce_fn))
 
   def scalar(self, name, tensor, reduce_fn=tf.math.reduce_mean):
     """Add a summary for a scalar tensor."""
     if not self.record:
       return
-    tensor = tf.convert_to_tensor(tensor)
-    if tensor.shape.ndims == 0:
-      tensor = tf.expand_dims(tensor, 0)
-    self._entries.append(
-        TpuSummaryEntry(summary.scalar, name, tensor, reduce_fn))
+    name_id = name.replace("/", "_")
+    with tfutil.absolute_name_scope("Autosummary/" + name_id):
+      tensor = tf.convert_to_tensor(tensor)
+      if tensor.shape.ndims == 0:
+        tensor = tf.expand_dims(tensor, 0)
+      self._entries.append(
+          TpuSummaryEntry(summary.scalar, name, tensor, reduce_fn))
 
   def get_host_call(self):
     """Returns the tuple (host_call_fn, host_call_args) for TPUEstimatorSpec."""
@@ -108,7 +114,9 @@ class TpuSummaries(object):
       with summary.record_summaries_every_n_global_steps(
           self._save_summary_steps, step):
         for i, e in enumerate(self._entries):
-          value = e.reduce_fn(args[i])
-          e.summary_fn(e.name, value, step=step)
+          name_id = e.name.replace("/", "_")
+          with tfutil.absolute_name_scope("Autosummary/" + name_id):
+            value = e.reduce_fn(args[i])
+            e.summary_fn(e.name, value, step=step)
         return summary.all_summary_ops()
 

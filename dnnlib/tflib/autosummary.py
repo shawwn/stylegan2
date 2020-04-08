@@ -198,6 +198,7 @@ def autosummary(name: str, value: TfExpressionEx, passthru: TfExpressionEx = Non
     with tf.control_dependencies([autosummary('l2loss', loss)]):
         n = tf.identity(n)
     """
+    tf.logging.info('autosummary(%s, %s)', repr(name), repr(value))
     get_tpu_summary().scalar(name, value)
     return value
     tfutil.assert_tf_initialized()
