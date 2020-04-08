@@ -832,11 +832,10 @@ def graph_spectral_norm(w):
   return w
 
 def graph_images(images):
-    if images is None:
-        return
     images = tf.identity(images)
     name = images.name.split(':')[0]
     tf.logging.info('graph_images(%s, %s)', repr(name), repr(images))
+    return images
 
 def conv2d(inputs, output_dim, k_h, k_w, d_h, d_w, stddev=0.02, name="conv2d",
            use_sn=False, use_bias=True):
