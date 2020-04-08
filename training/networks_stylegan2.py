@@ -832,6 +832,8 @@ def graph_spectral_norm(w):
   return w
 
 def graph_images(images):
+    if images is None:
+        return
     images = tf.identity(images)
     name = images.name.split(':')[0]
     tf.logging.info('graph_images(%s, %s)', repr(name), repr(images))
