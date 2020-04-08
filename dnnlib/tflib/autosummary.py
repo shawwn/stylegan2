@@ -189,7 +189,7 @@ def autoimages(summary_name, images, grid_shape=None):
                         repr(summary_name), repr(images),
                         image_shape[0], image_shape[1],
                         sample_shape[0], sample_shape[1])
-        images = tf.image.resize(images, sample_shape, method=tf.image.ResizeMethod.AREA)
+        images = tf.image.resize(images, sample_shape[0:2], method=tf.image.ResizeMethod.AREA)
 
     def _merge_images_to_grid(all_images):
         return image_grid(
