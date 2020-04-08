@@ -14,7 +14,7 @@ import dnnlib.tflib as tflib
 from dnnlib.tflib.ops.upfirdn_2d import upsample_2d, downsample_2d, upsample_conv_2d, conv_downsample_2d
 from dnnlib.tflib.ops.fused_bias_act import fused_bias_act
 import functools
-from dnnlib.tflib.autosummary import autosummary
+from dnnlib.tflib.autosummary import autosummary, autoimages
 
 # NOTE: Do not import any application-specific modules here!
 # Specify all network parameters as kwargs.
@@ -489,7 +489,7 @@ def G_synthesis_stylegan2(
     def torgb(x, y, res): # res = 2..resolution_log2
         with tf.variable_scope('ToRGB'):
             t = apply_bias_act(modulated_conv2d_layer(x, dlatents_in[:, res*2-3], fmaps=num_channels, kernel=1, demodulate=False, fused_modconv=fused_modconv))
-            return graph_images(t if y is None else y + t)
+            return graph_images(t if y is None else y + t, res=2**res)
 
     # Early layers.
     y = None
@@ -817,24 +817,33 @@ def spectral_norm(inputs, epsilon=1e-12, singular_value="left", return_normalize
   else:
     return w, norm_value
 
-def graph_spectral_norm(w):
-  norm = spectral_norm(w, return_normalized=False)[1][0][0]
-  name = norm.name.split(':')[0]
+def graph_name(name):
+  name = name.split(':')[0]
   name = name.split('/strided_slice_')[0]
+  name = name.split('/Identity_')[0]
   if name.startswith('D_loss/G/G_synthesis/'):
     name = name.replace('D_loss/G/G_synthesis/', '')
-    autosummary('specnorm_G_' + name, norm)
+    return 'G_' + name
   elif name.startswith('D_loss/D/'):
     name = name.replace('D_loss/D/', '')
-    autosummary('specnorm_D_' + name, norm)
+    return 'D_' + name
+
+def graph_spectral_norm(w):
+  value = spectral_norm(w, return_normalized=False)[1][0][0]
+  name = graph_name(value.name)
+  if name is not None:
+    autosummary('specnorm_' + name, value)
   else:
-    tf.logging.info('ignoring autosummary(%s, %s)', repr(name), repr(norm))
+    tf.logging.info('ignoring autosummary(%s, %s)', repr(name), repr(value))
   return w
 
-def graph_images(images):
-    images = tf.identity(images)
-    name = images.name.split(':')[0]
-    tf.logging.info('graph_images(%s, %s)', repr(name), repr(images))
+def graph_images(images, res):
+    value = tf.identity(images)
+    name = graph_name(value.name)
+    if name is not None:
+      autoimages(name, value, res=res)
+    else:
+      tf.logging.info('ignoring autoimages(%s, %s)', repr(name), repr(value))
     return images
 
 def conv2d(inputs, output_dim, k_h, k_w, d_h, d_w, stddev=0.02, name="conv2d",
