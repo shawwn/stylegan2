@@ -820,10 +820,13 @@ def spectral_norm(inputs, epsilon=1e-12, singular_value="left", return_normalize
 def graph_spectral_norm(w):
   norm = spectral_norm(w, return_normalized=False)[1][0][0]
   name = norm.name.split(':')[0]
+  name = name.split('/strided_slice_')[0]
   if name.startswith('D_loss/G/G_synthesis/'):
     name = name.replace('D_loss/G/G_synthesis/', '')
-    name = name.replace('/strided_slice_2', '')
-    autosummary('specnorm_' + name, norm)
+    autosummary('specnorm_G_' + name, norm)
+  elif name.startswith('D/'):
+    name = name.replace('D/', '')
+    autosummary('specnorm_D_' + name, norm)
   else:
     tf.logging.info('ignoring autosummary(%s, %s)', repr(name), repr(norm))
   return w
