@@ -818,7 +818,7 @@ def spectral_norm(inputs, epsilon=1e-12, singular_value="left", return_normalize
 
 def graph_spectral_norm(w, name=tf.get_variable_scope().name):
     norm = spectral_norm(w, return_normalized=False)[1][0][0]
-    autosummary('specnorm/' + name, norm)
+    autosummary('specnorm/' + name.replace('/', '_'), norm)
     return w
 
 def conv2d(inputs, output_dim, k_h, k_w, d_h, d_w, stddev=0.02, name="conv2d",
