@@ -176,7 +176,7 @@ def autoimages(summary_name, images, grid_shape=None):
         res = int(os.environ['RESOLUTION']) if 'RESOLUTION' in os.environ else 64
         num_channels = int(os.environ["NUM_CHANNELS"]) if "NUM_CHANNELS" in os.environ else 3
         image_shape = [res, res, num_channels]
-        tf.logging.info("Creating images summary for fake images: %s at resolution %dx%d with channel count %d", all_images, image_shape[0], image_shape[1], image_shape[2])
+        tf.logging.info("Creating images summary for %s at resolution %dx%d with channel count %d: %s", summary_name, image_shape[0], image_shape[1], image_shape[2], all_images)
         return image_grid(
             all_images[:np.prod(grid_shape)],
             grid_shape=grid_shape,
