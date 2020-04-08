@@ -57,7 +57,7 @@ def dense_layer(x, fmaps, gain=1, use_wscale=True, lrmul=1, weight_var='weight')
 def conv2d_layer(x, fmaps, kernel, up=False, down=False, resample_kernel=None, gain=1, use_wscale=True, lrmul=1, weight_var='weight'):
     assert not (up and down)
     assert kernel >= 1 and kernel % 2 == 1
-    w = get_weight([kernel, kernel, x.shape[1].value, fmaps], gain=gain, use_wscale=use_wscale, lrmul=lrmul, weight_var=weight_var)
+    w = graph_spectral_norm(get_weight([kernel, kernel, x.shape[1].value, fmaps], gain=gain, use_wscale=use_wscale, lrmul=lrmul, weight_var=weight_var))
     if up:
         x = _o(upsample_conv_2d(_i(x), tf.cast(w, x.dtype), data_format='NHWC', k=resample_kernel))
     elif down:
@@ -824,6 +824,8 @@ def graph_spectral_norm(w):
     name = name.replace('D_loss/G/G_synthesis/', '')
     name = name.replace('/strided_slice_2', '')
     autosummary('specnorm_' + name, norm)
+  else:
+    tf.logging.info('ignoring autosummary(%s, %s)', repr(name), repr(norm))
   return w
 
 def conv2d(inputs, output_dim, k_h, k_w, d_h, d_w, stddev=0.02, name="conv2d",
