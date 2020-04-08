@@ -149,8 +149,13 @@ def set_num_replicas(n):
     global num_replicas
     num_replicas = n
 
+def _i(x): return tf.transpose(x, [0, 2, 3, 1])
+def _o(x): return tf.transpose(x, [0, 3, 1, 2])
+
 def autoimages(summary_name, images, grid_shape=None):
     """Called from model_fn() to add a grid of images as summary."""
+    # convert from [batch, channels, width, height] to [batch, width, height, channels]
+    images = _i(images)
     # All summary tensors are synced to host 0 on every step. To avoid sending
     # more images then needed we transfer at most `sampler_per_replica` to
     # create a 8x8 image grid.
