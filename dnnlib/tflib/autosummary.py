@@ -152,7 +152,7 @@ def set_num_replicas(n):
 def _i(x): return tf.transpose(x, [0, 2, 3, 1])
 def _o(x): return tf.transpose(x, [0, 3, 1, 2])
 
-def autoimages(summary_name, images, grid_shape=None):
+def autoimages(summary_name, images, grid_shape=None, res=None):
     """Called from model_fn() to add a grid of images as summary."""
     # convert from [batch, channels, width, height] to [batch, width, height, channels]
     images = _i(images)
@@ -174,7 +174,8 @@ def autoimages(summary_name, images, grid_shape=None):
         samples_per_replica = int(np.ceil(sample_num_images / num_replicas))
     else:
         samples_per_replica = batch_size_per_replica
-    res = int(os.environ['RESOLUTION']) if 'RESOLUTION' in os.environ else 64
+    if res is None:
+        res = int(os.environ['RESOLUTION']) if 'RESOLUTION' in os.environ else 64
     num_channels = int(os.environ["NUM_CHANNELS"]) if "NUM_CHANNELS" in os.environ else 3
     image_shape = [res, res, num_channels]
     sample_res = int(os.environ['GRID_RESOLUTION']) if 'GRID_RESOLUTION' in os.environ else 200
