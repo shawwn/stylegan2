@@ -39,10 +39,12 @@ def D_logistic(G, D, opt, training_set, minibatch_size, reals, labels):
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
     real_scores_out = D.get_output_for(reals, labels, is_training=True)
     fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
-    real_scores_out = autosummary('Loss/scores/real', real_scores_out)
-    fake_scores_out = autosummary('Loss/scores/fake', fake_scores_out)
-    loss = tf.nn.softplus(fake_scores_out) # -log(1-sigmoid(fake_scores_out))
-    loss += tf.nn.softplus(-real_scores_out) # -log(sigmoid(real_scores_out)) # pylint: disable=invalid-unary-operand-type
+    real_scores_out = autosummary('D_logistic/scores/real', real_scores_out)
+    fake_scores_out = autosummary('D_logistic/scores/fake', fake_scores_out)
+    loss = autosummary('D_logistic/loss/fake', tf.nn.softplus(fake_scores_out)) # -log(1-sigmoid(fake_scores_out))
+    loss += autosummary('D_logistic/loss/real', tf.nn.softplus(-real_scores_out)) # -log(sigmoid(real_scores_out)) # pylint: disable=invalid-unary-operand-type
+    autoimages('D_logistic/images/real', reals)
+    autoimages('D_logistic/images/fake', fake_images_out)
     return loss, None
 
 #----------------------------------------------------------------------------
@@ -55,16 +57,17 @@ def D_logistic_r1(G, D, opt, training_set, minibatch_size, reals, labels, gamma=
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
     real_scores_out = D.get_output_for(reals, labels, is_training=True)
     fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
-    real_scores_out = autosummary('Loss/scores/real', real_scores_out)
-    fake_scores_out = autosummary('Loss/scores/fake', fake_scores_out)
-    loss = tf.nn.softplus(fake_scores_out) # -log(1-sigmoid(fake_scores_out))
-    loss += tf.nn.softplus(-real_scores_out) # -log(sigmoid(real_scores_out)) # pylint: disable=invalid-unary-operand-type
-
+    real_scores_out = autosummary('D_logistic_r1/scores/real', real_scores_out)
+    fake_scores_out = autosummary('D_logistic_r1/scores/fake', fake_scores_out)
+    loss = autosummary('D_logistic_r1/loss/fake', tf.nn.softplus(fake_scores_out)) # -log(1-sigmoid(fake_scores_out))
+    loss += autosummary('D_logistic_r1/loss/real', tf.nn.softplus(-real_scores_out)) # -log(sigmoid(real_scores_out)) # pylint: disable=invalid-unary-operand-type
     with tf.name_scope('GradientPenalty'):
         real_grads = tf.gradients(tf.reduce_sum(real_scores_out), [reals])[0]
         gradient_penalty = tf.reduce_sum(tf.square(real_grads), axis=[1,2,3])
-        gradient_penalty = autosummary('Loss/gradient_penalty', gradient_penalty)
+        gradient_penalty = autosummary('D_logistic_r1/gradient_penalty', gradient_penalty)
         reg = gradient_penalty * (gamma * 0.5)
+    autoimages('D_logistic_r1/images/real', reals)
+    autoimages('D_logistic_r1/images/fake', fake_images_out)
     return loss, reg
 
 def D_logistic_r2(G, D, opt, training_set, minibatch_size, reals, labels, gamma=10.0):
@@ -73,19 +76,17 @@ def D_logistic_r2(G, D, opt, training_set, minibatch_size, reals, labels, gamma=
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
     real_scores_out = D.get_output_for(reals, labels, is_training=True)
     fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
-    real_scores_out = autosummary('Loss/scores/real', real_scores_out)
-    fake_scores_out = autosummary('Loss/scores/fake', fake_scores_out)
-    loss = tf.nn.softplus(fake_scores_out) # -log(1-sigmoid(fake_scores_out))
-    loss += tf.nn.softplus(-real_scores_out) # -log(sigmoid(real_scores_out)) # pylint: disable=invalid-unary-operand-type
-
-    autoimages("Loss/images/real", reals)
-    autoimages("Loss/images/fake", fake_images_out)
-
+    real_scores_out = autosummary('D_logistic_r2/scores/real', real_scores_out)
+    fake_scores_out = autosummary('D_logistic_r2/scores/fake', fake_scores_out)
+    loss = autosummary('D_logistic_r2/loss/fake', tf.nn.softplus(fake_scores_out)) # -log(1-sigmoid(fake_scores_out))
+    loss += autosummary('D_logistic_r2/loss/real', tf.nn.softplus(-real_scores_out)) # -log(sigmoid(real_scores_out)) # pylint: disable=invalid-unary-operand-type
     with tf.name_scope('GradientPenalty'):
         fake_grads = tf.gradients(tf.reduce_sum(fake_scores_out), [fake_images_out])[0]
         gradient_penalty = tf.reduce_sum(tf.square(fake_grads), axis=[1,2,3])
-        gradient_penalty = autosummary('Loss/gradient_penalty', gradient_penalty)
+        gradient_penalty = autosummary('D_logistic_r2/gradient_penalty', gradient_penalty)
         reg = gradient_penalty * (gamma * 0.5)
+    autoimages('D_logistic_r2/images/real', reals)
+    autoimages('D_logistic_r2/images/fake', fake_images_out)
     return loss, reg
 
 #----------------------------------------------------------------------------
@@ -107,12 +108,15 @@ def D_wgan(G, D, opt, training_set, minibatch_size, reals, labels, wgan_epsilon=
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
     real_scores_out = D.get_output_for(reals, labels, is_training=True)
     fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
-    real_scores_out = autosummary('Loss/scores/real', real_scores_out)
-    fake_scores_out = autosummary('Loss/scores/fake', fake_scores_out)
-    loss = fake_scores_out - real_scores_out
+    real_scores_out = autosummary('D_wgan/scores/real', real_scores_out)
+    fake_scores_out = autosummary('D_wgan/scores/fake', fake_scores_out)
+    loss = autosummary('D_wgan/loss/fake', fake_scores_out)
+    loss += autosummary('D_wgan/loss/real', -real_scores_out)
     with tf.name_scope('EpsilonPenalty'):
-        epsilon_penalty = autosummary('Loss/epsilon_penalty', tf.square(real_scores_out))
+        epsilon_penalty = autosummary('D_wgan/epsilon_penalty', tf.square(real_scores_out))
         loss += epsilon_penalty * wgan_epsilon
+    autoimages('D_wgan/images/real', reals)
+    autoimages('D_wgan/images/fake', fake_images_out)
     return loss, None
 
 #----------------------------------------------------------------------------
@@ -125,23 +129,26 @@ def D_wgan_gp(G, D, opt, training_set, minibatch_size, reals, labels, wgan_lambd
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
     real_scores_out = D.get_output_for(reals, labels, is_training=True)
     fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
-    real_scores_out = autosummary('Loss/scores/real', real_scores_out)
-    fake_scores_out = autosummary('Loss/scores/fake', fake_scores_out)
-    loss = fake_scores_out - real_scores_out
+    real_scores_out = autosummary('D_wgan_gp/scores/real', real_scores_out)
+    fake_scores_out = autosummary('D_wgan_gp/scores/fake', fake_scores_out)
+    loss = autosummary('D_wgan_gp/loss/fake', fake_scores_out)
+    loss += autosummary('D_wgan_gp/loss/real', -real_scores_out)
     with tf.name_scope('EpsilonPenalty'):
-        epsilon_penalty = autosummary('Loss/epsilon_penalty', tf.square(real_scores_out))
+        epsilon_penalty = autosummary('D_wgan_gp/epsilon_penalty', tf.square(real_scores_out))
     loss += epsilon_penalty * wgan_epsilon
 
     with tf.name_scope('GradientPenalty'):
         mixing_factors = tf.random_uniform([minibatch_size, 1, 1, 1], 0.0, 1.0, dtype=fake_images_out.dtype)
         mixed_images_out = tflib.lerp(tf.cast(reals, fake_images_out.dtype), fake_images_out, mixing_factors)
         mixed_scores_out = D.get_output_for(mixed_images_out, labels, is_training=True)
-        mixed_scores_out = autosummary('Loss/scores/mixed', mixed_scores_out)
+        mixed_scores_out = autosummary('D_wgan_gp/scores/mixed', mixed_scores_out)
         mixed_grads = tf.gradients(tf.reduce_sum(mixed_scores_out), [mixed_images_out])[0]
         mixed_norms = tf.sqrt(tf.reduce_sum(tf.square(mixed_grads), axis=[1,2,3]))
-        mixed_norms = autosummary('Loss/mixed_norms', mixed_norms)
+        mixed_norms = autosummary('D_wgan_gp/mixed_norms', mixed_norms)
         gradient_penalty = tf.square(mixed_norms - wgan_target)
         reg = gradient_penalty * (wgan_lambda / (wgan_target**2))
+    autoimages('D_wgan_gp/images/real', reals)
+    autoimages('D_wgan_gp/images/fake', fake_images_out)
     return loss, reg
 
 #----------------------------------------------------------------------------
@@ -170,7 +177,7 @@ def G_logistic_ns_pathreg(G, D, opt, training_set, minibatch_size, pl_minibatch_
         pl_noise = tf.random_normal(tf.shape(fake_images_out)) / np.sqrt(np.prod(G.output_shape[2:]))
         pl_grads = tf.gradients(tf.reduce_sum(fake_images_out * pl_noise), [fake_dlatents_out])[0]
         pl_lengths = tf.sqrt(tf.reduce_mean(tf.reduce_sum(tf.square(pl_grads), axis=2), axis=1))
-        pl_lengths = autosummary('Loss/pl_lengths', pl_lengths)
+        pl_lengths = autosummary('G_logistic_ns_pathreg/pl_lengths', pl_lengths)
 
         # Track exponential moving average of |J*y|.
         with tf.control_dependencies(None):
@@ -181,7 +188,7 @@ def G_logistic_ns_pathreg(G, D, opt, training_set, minibatch_size, pl_minibatch_
         # Calculate (|J*y|-a)^2.
         with tf.control_dependencies([pl_update]):
             pl_penalty = tf.square(pl_lengths - pl_mean)
-            pl_penalty = autosummary('Loss/pl_penalty', pl_penalty)
+            pl_penalty = autosummary('G_logistic_ns_pathreg/pl_penalty', pl_penalty)
 
         # Apply weight.
         #
