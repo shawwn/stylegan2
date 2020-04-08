@@ -184,16 +184,17 @@ def autoimages(summary_name, images, grid_shape=None):
                     grid_shape[0], grid_shape[1], image_shape[0], image_shape[1], image_shape[2],
                     num_replicas)
     images = images[:samples_per_replica]
-    if image_shape[0] > sample_shape[0] or image_shape[1] > sample_shape[1]:
-        tf.logging.info('autoimages(%s, %s): Downscaling sampled images from %dx%d to %dx%d',
-                        repr(summary_name), repr(images),
-                        image_shape[0], image_shape[1],
-                        sample_shape[0], sample_shape[1])
-        images = tf.image.resize(images, sample_shape[0:2], method=tf.image.ResizeMethod.AREA)
 
     def _merge_images_to_grid(all_images):
+        all_images = all_images[:np.prod(grid_shape)]
+        if image_shape[0] > sample_shape[0] or image_shape[1] > sample_shape[1]:
+            tf.logging.info('autoimages(%s, %s): Downscaling sampled images from %dx%d to %dx%d',
+                            repr(summary_name), repr(all_images),
+                            image_shape[0], image_shape[1],
+                            sample_shape[0], sample_shape[1])
+            all_images = tf.image.resize(all_images, sample_shape[0:2], method=tf.image.ResizeMethod.AREA)
         return image_grid(
-            all_images[:np.prod(grid_shape)],
+            all_images,
             grid_shape=grid_shape,
             image_shape=sample_shape[:2],
             num_channels=sample_shape[2])
