@@ -829,12 +829,18 @@ def graph_name(name):
     return 'D_' + name
 
 def graph_spectral_norm(w):
-  value = spectral_norm(w, return_normalized=False)[1][0][0]
+  w1, norm = spectral_norm(w, return_normalized=False)
+  value = norm[0][0]
   name = graph_name(value.name)
   if name is not None:
     autosummary('specnorm_' + name, value)
   else:
     tf.logging.info('ignoring autosummary(%s, %s)', repr(name), repr(value))
+  if 'USE_SPECNORM' in os.environ:
+    tf.logging.info('Using spectral normalization for %s', repr(w))
+    w_normalized = w1 / norm
+    w_normalized = tf.reshape(w_normalized, w.shape)
+    return w_normalized
   return w
 
 def graph_images(images, res):
