@@ -170,7 +170,7 @@ def get_waifu(tags, seed = 0, mu = 0, sigma = 0, truncation=None):
       img = misc.convert_to_pil_image(misc.create_image_grid(result, (1, 1)), drange_net)
       #new_im = misc.convert_to_pil_image(result, drange_net)
       img.save('waifu.png')
-      return result, img
+      return result, img, test_words
 
     #display(new_im)
 
@@ -179,24 +179,27 @@ import asyncio
 
 client = discord.Client()
 token=discord_token
-channel_name = 'bot-screenshots'
+#channel_name = 'bot-screenshots'
 
 async def send_picture(channel, image, kind='png', name='test', text=None):
     img = misc.convert_to_pil_image(image, [-1, 1])
     f = BytesIO()
     img.save(f, kind)
+    img.save("avatar.jpg")
     f.seek(0)
     picture = discord.File(f)
     picture.filename = name + '.' + kind
     await channel.send(content=text, file=picture)
+    with open('avatar.jpg', 'rb') as ava:
+        await client.user.edit(avatar=ava.read())
 
 @client.event
 async def on_ready():
     print('Logged on as {0}!'.format(client.user))
-    channel = [x for x in list(client.get_all_channels()) if channel_name in x.name]
-    assert len(channel) == 1
-    channel = channel[0]
-    print(channel)
+    #channel = [x for x in list(client.get_all_channels()) if channel_name in x.name]
+    #assert len(channel) == 1
+    #channel = channel[0]
+    #print(channel)
     #await send_picture(channel, image, kind=kind, name=name, text=text)
 
 import subprocess
@@ -212,7 +215,8 @@ import shlex
 def args(msg):
     return shlex.split(msg)[1:]
 
-admins = ['arfa#1551', 'shawwn#3694']
+#admins = ['arfa#1551', 'shawwn#3694']
+admins = ['shawwn#3694']
 
 from io import StringIO
 
@@ -289,8 +293,8 @@ async def on_message(message):
             tags = message.content[6:]
             print("Tags:", tags)
             seed = np.random.randint(10000)
-            result, img = get_waifu(tags, seed=seed)
-            text = 'Waifu from `{}` with tags `{}` and seed `{}`'.format(model_dir, tags, seed)
+            result, img, test_words = get_waifu(tags, seed=seed)
+            text = 'Waifu from `{}` with tags `{}` and seed `{}`'.format(model_dir, test_words, seed)
             await send_picture(message.channel, misc.create_image_grid(result, (1,1)), kind="png", name='waifu', text=text)
         elif message.content.startswith("!error"):
             argv = args(message.content)
