@@ -19,6 +19,9 @@ from dnnlib.tflib.autosummary import autosummary, autoimages
 # NOTE: Do not import any application-specific modules here!
 # Specify all network parameters as kwargs.
 
+def _i(x): return tf.transpose(x, [0,2,3,1])
+def _o(x): return tf.transpose(x, [0,3,1,2])
+
 #----------------------------------------------------------------------------
 # Get/create weight tensor for a convolution or fully-connected layer.
 

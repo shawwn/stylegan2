@@ -11,9 +11,6 @@ import numpy as np
 import tensorflow as tf
 from .. import custom_ops
 
-def _i(x): return [x[0],x[2],x[3],x[1]] if isinstance(x, list) or isinstance(x, tuple) else tf.transpose(x, [0,2,3,1])
-def _o(x): return [x[0],x[3],x[1],x[2]] if isinstance(x, list) or isinstance(x, tuple) else tf.transpose(x, [0,3,1,2])
-
 def _get_plugin():
     return custom_ops.get_plugin(os.path.splitext(__file__)[0] + '.cu')
 
