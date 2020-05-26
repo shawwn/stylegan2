@@ -13,7 +13,7 @@ mirror=true
 metrics=none
 
 export TPU_HOST=10.255.128.2
-export TPU_NAME=tpu-v3-128-euw4a-53
+export TPU_NAME=tpu-v3-512-euw4a-53
 cores=512
 export IMAGENET_TFRECORD_DATASET='gs://dota-euw4a/datasets/ffhq1024/ffhq1024-0*'
 run_name=run76
