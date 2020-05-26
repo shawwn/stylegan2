@@ -641,6 +641,8 @@ def training_loop(
     model_dir=os.environ['MODEL_DIR'] if 'MODEL_DIR' in os.environ else 'gs://danbooru-euw4a/test/run30/'
     tpu_cluster_resolver = tflex.get_tpu_resolver()
     spatial_partition_factor = max(1, int(os.environ.get('SPATIAL_PARTITION_FACTOR', '1')))
+    assert batch_size % (spatial_partition_factor * spatial_partition_factor) == 0
+    batch_size //= spatial_partition_factor * spatial_partition_factor
     if spatial_partition_factor <= 1:
         tpu_config = tf.contrib.tpu.TPUConfig(iterations_per_loop=256)
     else:
