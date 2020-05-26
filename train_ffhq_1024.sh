@@ -13,12 +13,12 @@ mirror=true
 metrics=none
 
 export TPU_HOST=10.255.128.2
-export TPU_NAME=tpu-v3-128-euw4a-51
-cores=128
+export TPU_NAME=tpu-v3-128-euw4a-53
+cores=512
 export IMAGENET_TFRECORD_DATASET='gs://dota-euw4a/datasets/ffhq1024/ffhq1024-0*'
 run_name=run76
 export MODEL_DIR=gs://dota-euw4a/runs/${run_name}-ffhq-1024-mirror/
-export BATCH_PER=4
+export BATCH_PER=2
 export BATCH_SIZE=$(($BATCH_PER * $cores))
 export SPATIAL_PARTITION_FACTOR=2
 export RESOLUTION=1024
