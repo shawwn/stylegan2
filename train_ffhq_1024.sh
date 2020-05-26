@@ -8,7 +8,7 @@ config="config-f" # StyleGAN 2
 #config="config-a" # StyleGAN 1
 
 data_dir=gs://dota-euw4a/datasets
-dataset=animefaces
+dataset=ffhq
 mirror=true
 metrics=none
 
@@ -27,4 +27,8 @@ export IMAGENET_UNCONDITIONAL=1
 #export LABEL_FILE=gs://arfa-euw4a/datasets/e621-cond/e621-cond-rxx.labels
 
 set -x
-exec python3 run_training.py --num-gpus="${cores}" --data-dir="${data_dir}" --config="${config}" --dataset="${dataset}" --mirror-augment="${mirror}" --metrics="${metrics}" "$@"
+#exec python3 run_training.py --num-gpus="${cores}" --data-dir="${data_dir}" --config="${config}" --dataset="${dataset}" --mirror-augment="${mirror}" --metrics="${metrics}" "$@"
+while true; do
+  timeout --signal=SIGKILL 19h python3 run_training.py --num-gpus="${cores}" --data-dir="${data_dir}" --config="${config}" --dataset="${dataset}" --mirror-augment="${mirror}" --metrics="${metrics}" "$@"
+  sleep 30
+done
