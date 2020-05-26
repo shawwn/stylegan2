@@ -178,7 +178,7 @@ def autoimages(summary_name, images, grid_shape=None, res=None):
         res = int(os.environ['RESOLUTION']) if 'RESOLUTION' in os.environ else 64
     num_channels = int(os.environ["NUM_CHANNELS"]) if "NUM_CHANNELS" in os.environ else 3
     image_shape = [res, res, num_channels]
-    sample_res = int(os.environ['GRID_RESOLUTION']) if 'GRID_RESOLUTION' in os.environ else 200
+    sample_res = int(os.environ['GRID_RESOLUTION']) if 'GRID_RESOLUTION' in os.environ else 2048
     sample_shape = [sample_res, sample_res, num_channels]
     tf.logging.info("autoimages(%s, %s): Creating %dx%d images grid at resolution %dx%d channel count %d across %d replicas",
                     repr(summary_name), repr(images),
