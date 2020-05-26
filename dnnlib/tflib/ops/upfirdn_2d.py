@@ -96,7 +96,7 @@ def _upfirdn_2d_ref(x, k, upx, upy, downx, downy, padx0, padx1, pady0, pady1):
     x = tf.transpose(x, [0, 3, 1, 2])
     x = tf.reshape(x, [-1, 1, inH * upy + pady0 + pady1, inW * upx + padx0 + padx1])
     w = tf.constant(k[::-1, ::-1, np.newaxis, np.newaxis], dtype=x.dtype)
-    x = _o(tf.nn.conv2d(_i(x), w, strides=[1,1,1,1], padding='VALID', data_format='NHWC'))
+    x = tf.nn.conv2d(x, w, strides=[1,1,1,1], padding='VALID', data_format='NCHW')
     x = tf.reshape(x, [-1, minorDim, inH * upy + pady0 + pady1 - kernelH + 1, inW * upx + padx0 + padx1 - kernelW + 1])
     x = tf.transpose(x, [0, 2, 3, 1])
 
@@ -291,7 +291,7 @@ def upsample_conv_2d(x, w, k=None, factor=2, gain=1, data_format='NCHW', impl='c
     w = tf.reshape(w, [convH, convW, -1, num_groups * inC])
 
     # Execute.
-    x = _o(tf.nn.conv2d_transpose(_i(x), w, output_shape=_i(output_shape), strides=_i(stride), padding='VALID', data_format='NHWC'))
+    x = tf.nn.conv2d_transpose(x, w, output_shape=output_shape, strides=stride, padding='VALID', data_format=data_format)
     return _simple_upfirdn_2d(x, k, pad0=(p+1)//2+factor-1, pad1=p//2+1, data_format=data_format, impl=impl)
 
 #----------------------------------------------------------------------------
@@ -327,13 +327,12 @@ def conv_downsample_2d(x, w, k=None, factor=2, gain=1, data_format='NCHW', impl=
         k = [1] * factor
     k = _setup_kernel(k) * gain
     p = (k.shape[0] - factor) + (convW - 1)
-    x = _simple_upfirdn_2d(x, k, pad0=(p+1)//2, pad1=p//2, data_format=data_format, impl=impl)
     if data_format == 'NCHW':
         s = [1, 1, factor, factor]
-        return _o(tf.nn.conv2d(_i(x), w, strides=s, padding='VALID', data_format='NHWC'))
     else:
         s = [1, factor, factor, 1]
-        return tf.nn.conv2d(x, w, strides=s, padding='VALID', data_format=data_format)
+    x = _simple_upfirdn_2d(x, k, pad0=(p+1)//2, pad1=p//2, data_format=data_format, impl=impl)
+    return tf.nn.conv2d(x, w, strides=s, padding='VALID', data_format=data_format)
 
 #----------------------------------------------------------------------------
 # Internal helper funcs.
