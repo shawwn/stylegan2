@@ -640,6 +640,16 @@ def training_loop(
     pprint(sched_args)
     model_dir=os.environ['MODEL_DIR'] if 'MODEL_DIR' in os.environ else 'gs://danbooru-euw4a/test/run30/'
     tpu_cluster_resolver = tflex.get_tpu_resolver()
+    spatial_partition_factor = max(1, int(os.environ.get('SPATIAL_PARTITION_FACTOR', '1')))
+    if spatial_partition_factor <= 1:
+        tpu_config = tf.contrib.tpu.TPUConfig(iterations_per_loop=256)
+    else:
+        # https://cloud.google.com/tpu/docs/spatial-partitioning
+        from tensorflow.python.tpu.tpu_config import InputPipelineConfig
+        tpu_config = tf.contrib.tpu.TPUConfig(iterations_per_loop=256,
+            per_host_input_for_training=InputPipelineConfig.PER_HOST_V2,
+            num_cores_per_replica=spatial_partition_factor * spatial_partition_factor,
+            input_partition_dims=[[1, 1, spatial_partition_factor, spatial_partition_factor], None])
     run_config = tf.contrib.tpu.RunConfig(
         model_dir=model_dir,
         #save_checkpoints_steps=100,
@@ -647,7 +657,7 @@ def training_loop(
         keep_checkpoint_max=10,
         keep_checkpoint_every_n_hours=1,
         cluster=tpu_cluster_resolver,
-        tpu_config=tf.contrib.tpu.TPUConfig(iterations_per_loop=256))
+        tpu_config=tpu_config)
     estimator = tf.contrib.tpu.TPUEstimator(
         config=run_config,
         use_tpu=use_tpu,
