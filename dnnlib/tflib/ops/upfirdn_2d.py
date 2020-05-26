@@ -11,6 +11,9 @@ import numpy as np
 import tensorflow as tf
 from .. import custom_ops
 
+def _i(x): return tf.transpose(x, [0,2,3,1])
+def _o(x): return tf.transpose(x, [0,3,1,2])
+
 def _get_plugin():
     return custom_ops.get_plugin(os.path.splitext(__file__)[0] + '.cu')
 
@@ -288,7 +291,7 @@ def upsample_conv_2d(x, w, k=None, factor=2, gain=1, data_format='NCHW', impl='c
     w = tf.reshape(w, [convH, convW, -1, num_groups * inC])
 
     # Execute.
-    x = tf.nn.conv2d_transpose(x, w, output_shape=output_shape, strides=stride, padding='VALID', data_format=data_format)
+    x = _o(tf.nn.conv2d_transpose(_i(x), w, output_shape=output_shape, strides=stride, padding='VALID', data_format=data_format))
     return _simple_upfirdn_2d(x, k, pad0=(p+1)//2+factor-1, pad1=p//2+1, data_format=data_format, impl=impl)
 
 #----------------------------------------------------------------------------
