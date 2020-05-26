@@ -861,7 +861,7 @@ def conv2d(inputs, output_dim, k_h, k_w, d_h, d_w, stddev=0.02, name="conv2d",
         initializer=weight_initializer(stddev=stddev), use_resource=True)
     if use_sn:
       w = spectral_norm(w)
-    outputs = _o(tf.nn.conv2d(_i(inputs), w, strides=[1, 1, d_h, d_w], padding="SAME", data_format="NHWC")
+    outputs = _o(tf.nn.conv2d(_i(inputs), w, strides=[1, 1, d_h, d_w], padding="SAME", data_format="NHWC"))
     if use_bias:
       bias = tf.get_variable(
           "bias", [output_dim], initializer=tf.constant_initializer(0.0), use_resource=True)
