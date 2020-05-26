@@ -43,7 +43,6 @@ from __future__ import print_function
 
 import collections
 
-from absl import logging
 import tensorflow as tf
 
 
@@ -95,7 +94,7 @@ class TpuSummaries(object):
     global_step = tf.train.get_or_create_global_step()
     host_call_args = [tf.expand_dims(global_step, 0)]
     host_call_args.extend([e.tensor for e in self._entries])
-    logging.info("host_call_args: %s", host_call_args)
+    tf.logging.info("host_call_args: %s", host_call_args)
     return (self._host_call_fn, host_call_args)
 
   def _host_call_fn(self, step, *args):
@@ -103,7 +102,7 @@ class TpuSummaries(object):
     # Host call receives values from all tensor cores (concatenate on the
     # batch dimension). Step is the same for all cores.
     step = step[0]
-    logging.info("host_call_fn: args=%s", args)
+    tf.logging.info("host_call_fn: args=%s", args)
     with summary.create_file_writer(self._log_dir).as_default():
       with summary.record_summaries_every_n_global_steps(
           self._save_summary_steps, step):

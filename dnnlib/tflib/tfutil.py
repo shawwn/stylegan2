@@ -7,13 +7,14 @@
 """Miscellaneous helper utils for Tensorflow."""
 
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = os.environ.get('TF_CPP_MIN_LOG_LEVEL', '0')
 import numpy as np
 import tensorflow as tf
 import tflex
 
 # Silence deprecation warnings from TensorFlow 1.13 onwards
 import logging
-logging.getLogger('tensorflow').setLevel(logging.ERROR)
+logging.getLogger('tensorflow').setLevel(logging.DEBUG)
 import tensorflow.contrib   # requires TensorFlow 1.x!
 tf.contrib = tensorflow.contrib
 

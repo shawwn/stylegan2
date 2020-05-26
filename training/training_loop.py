@@ -517,7 +517,7 @@ def training_loop(
     resume_time             = 0.0,      # Assumed wallclock time at the beginning. Affects reporting.
     resume_with_new_nets    = False):   # Construct new networks according to G_args and D_args before resuming training?
 
-    tf.logging.set_verbosity(tf.logging.INFO)
+    tf.logging.set_verbosity(tf.logging.DEBUG)
 
     if resume_pkl is None and 'RESUME_PKL' in os.environ:
         resume_pkl = os.environ['RESUME_PKL']
