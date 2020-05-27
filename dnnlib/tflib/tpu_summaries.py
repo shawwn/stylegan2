@@ -103,11 +103,10 @@ class TpuSummaries(object):
     # batch dimension). Step is the same for all cores.
     step = step[0]
     tf.logging.info("host_call_fn: args=%s", args)
-    with summary.create_file_writer(self._log_dir).as_default():
-      with summary.record_summaries_every_n_global_steps(
-          self._save_summary_steps, step):
-        for i, e in enumerate(self._entries):
-          value = e.reduce_fn(args[i])
-          e.summary_fn(e.name, value, step=step)
-        return summary.all_summary_ops()
-
+    with summary.create_file_writer(self._log_dir).as_default() as writer:
+      #with summary.record_summaries_every_n_global_steps(self._save_summary_steps, step): # we control this via HOST_CALL_EVERY_N_STEPS now, so record every time we're called.
+      for i, e in enumerate(self._entries):
+        value = e.reduce_fn(args[i])
+        e.summary_fn(e.name, value, step=step)
+        with tf.control_dependencies([summary.all_summary_ops()]):
+          return writer.flush()
