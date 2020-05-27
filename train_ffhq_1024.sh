@@ -31,8 +31,21 @@ export IMAGENET_UNCONDITIONAL="${IMAGENET_UNCONDITIONAL:-1}"
 export ITERATIONS_PER_LOOP="${ITERATIONS_PER_LOOP:-64}"
 export HOST_CALL_EVERY_N_STEPS="${HOST_CALL_EVERY_N_STEPS:-16}"
 
-#exec python3 run_training.py --num-gpus="${cores}" --data-dir="${data_dir}" --config="${config}" --dataset="${dataset}" --mirror-augment="${mirror}" --metrics="${metrics}" "$@"
+if [ ! -z "$DD_API_KEY" ]
+then
+  export DATADOG_TRACE_DEBUG=true
+  export DD_PROFILING_CAPTURE_PCT=50
+  export DD_LOGS_INJECTION=true
+  export DD_TRACE_ANALYTICS_ENABLED=true
+  export DD_VERSION="stylegan2-${RUN_NAME}"
+  export DD_SERVICE=stylegan2
+  bin="pyddprofile"
+else
+  bin="python3"
+fi
+
+#exec "$bin" run_training.py --num-gpus="${cores}" --data-dir="${data_dir}" --config="${config}" --dataset="${dataset}" --mirror-augment="${mirror}" --metrics="${metrics}" "$@"
 while true; do
-  timeout --signal=SIGKILL 19h python3 run_training.py --num-gpus="${cores}" --data-dir="${data_dir}" --config="${config}" --dataset="${dataset}" --mirror-augment="${mirror}" --metrics="${metrics}" "$@" 2>&1 | tee -a "${RUN_NAME}.txt"
+  timeout --signal=SIGKILL 19h "$bin" run_training.py --num-gpus="${cores}" --data-dir="${data_dir}" --config="${config}" --dataset="${dataset}" --mirror-augment="${mirror}" --metrics="${metrics}" "$@" 2>&1 | tee -a "${RUN_NAME}.txt"
   sleep 30
 done
