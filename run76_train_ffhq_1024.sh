@@ -55,6 +55,8 @@ else
   bin="python3"
 fi
 
+tmux-set-title "stylegan2 | ${TPU_NAME}:${TPU_HOST} | ${RUN_NAME} | ${MODEL_DIR}"
+
 #exec "$bin" run_training.py --num-gpus="${cores}" --data-dir="${data_dir}" --config="${config}" --dataset="${dataset}" --mirror-augment="${mirror}" --metrics="${metrics}" "$@"
 while true; do
   timeout --signal=SIGKILL 19h "$bin" run_training.py --num-gpus="${cores}" --data-dir="${data_dir}" --config="${config}" --dataset="${dataset}" --mirror-augment="${mirror}" --metrics="${metrics}" "$@" 2>&1 | tee -a "${RUN_NAME}.txt"
