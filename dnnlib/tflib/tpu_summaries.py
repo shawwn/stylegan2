@@ -95,10 +95,10 @@ class TpuSummaries(object):
     # All host_call_args must be tensors with batch dimension.
     # All tensors are streamed to the host machine (mind the band width).
     global_step = tf.train.get_or_create_global_step()
-    host_call_args = [tf.expand_dims(global_step, 0)]
-    host_call_args.extend([e.tensor for e in self._entries])
-    tf.logging.info("host_call_args: %s", host_call_args)
-    return (self._host_call_fn, host_call_args)
+    self.host_call_args = [tf.expand_dims(global_step, 0)]
+    self.host_call_args.extend([e.tensor for e in self._entries])
+    tf.logging.info("host_call_args: %s", self.host_call_args)
+    return (self._host_call_fn, self.host_call_args)
 
   def _host_call_fn(self, step, *args):
     """Function that will run on the host machine."""
@@ -110,9 +110,12 @@ class TpuSummaries(object):
       with summary.record_summaries_every_n_global_steps(
           self._save_summary_steps, self._save_summary_steps): # always record, since we control this via HOST_CALL_EVERY_N_STEPS
         for i, e in enumerate(self._entries):
-          tf.logging.info("host_call_fn arg #%d entry=%r arg=%r", i, e, args[i])
-          name = args[i].name.split(':', 2)[0] + '/host_reduce'
-          value = e.reduce_fn(args[i], name=name)
-          e.summary_fn(e.name, value, step=step)
+          arg = self.host_call_args[i]
+          name = arg.name.split(':', 2)[0]
+          tf.logging.info("host_call_fn arg #%d %r arg=%r entry=%r", i, name, args[i], e)
+          input = tf.identity(args[i], name=name+'/host_input')
+          value = e.reduce_fn(input)
+          result = tf.identity(value, name=name+'/host_reduced')
+          e.summary_fn(e.name, result, step=step)
         return summary.all_summary_ops()
 
