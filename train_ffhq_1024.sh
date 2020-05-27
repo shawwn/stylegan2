@@ -38,10 +38,10 @@ export HOST_CALL_EVERY_N_STEPS="${HOST_CALL_EVERY_N_STEPS:-16}"
 
 if [ ! -z "$DD_API_KEY" ]
 then
-  export DATADOG_TRACE_DEBUG=true
-  export DD_PROFILING_CAPTURE_PCT=50
-  export DD_LOGS_INJECTION=true
-  export DD_TRACE_ANALYTICS_ENABLED=true
+  #export DATADOG_TRACE_DEBUG=true
+  export DD_PROFILING_CAPTURE_PCT=20
+  #export DD_LOGS_INJECTION=true
+  #export DD_TRACE_ANALYTICS_ENABLED=true
   export DD_VERSION="stylegan2-${RUN_NAME}"
   export DD_SERVICE=stylegan2
   bin="pyddprofile"
