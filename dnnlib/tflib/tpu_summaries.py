@@ -110,7 +110,9 @@ class TpuSummaries(object):
       with summary.record_summaries_every_n_global_steps(
           self._save_summary_steps, self._save_summary_steps): # always record, since we control this via HOST_CALL_EVERY_N_STEPS
         for i, e in enumerate(self._entries):
-          value = e.reduce_fn(args[i])
+          tf.logging.info("host_call_fn arg #%d entry=%r arg=%r", i, e, args[i])
+          name = args[i].name.split(':', 2)[0] + '/host_reduce'
+          value = e.reduce_fn(args[i], name=name)
           e.summary_fn(e.name, value, step=step)
         return summary.all_summary_ops()
 
