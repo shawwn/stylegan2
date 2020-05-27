@@ -108,5 +108,5 @@ class TpuSummaries(object):
       for i, e in enumerate(self._entries):
         value = e.reduce_fn(args[i])
         e.summary_fn(e.name, value, step=step)
-        with tf.control_dependencies(summary.all_summary_ops()):
-          return writer.flush()
+      with tf.control_dependencies(summary.all_summary_ops()):
+        return writer.flush()
