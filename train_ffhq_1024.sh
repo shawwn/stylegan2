@@ -14,6 +14,11 @@ metrics=none
 
 set -x
 
+if [ -f ./.env ]
+then
+  source ./.env
+fi
+
 export TPU_HOST="${TPU_HOST:-10.255.128.2}"
 export TPU_NAME="${TPU_NAME:-tpu-v3-512-euw4a-53}"
 cores="$(echo $TPU_NAME | splitby - | nthline 2)"
