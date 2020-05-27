@@ -21,10 +21,15 @@ fi
 
 export TPU_HOST="${TPU_HOST:-10.255.128.2}"
 export TPU_NAME="${TPU_NAME:-tpu-v3-512-euw4a-53}"
-cores="$(echo $TPU_NAME | splitby - | nthline 2)"
-export IMAGENET_TFRECORD_DATASET="${IMAGENET_TFRECORD_DATASET:-'gs://dota-euw4a/datasets/ffhq1024/ffhq1024-0*'}"
+cores="$(echo $TPU_NAME | sed 's/^tpu-v[23][-]\([0-9]*\).*$/\1/g')"
+if [ -z "$cores" ]
+then
+  1>&2 echo "Failed to parse TPU core count from $TPU_NAME"
+  exit 1
+fi
+export IMAGENET_TFRECORD_DATASET="${IMAGENET_TFRECORD_DATASET:-gs://dota-euw4a/datasets/ffhq1024/ffhq1024-0*}"
 export RUN_NAME="${RUN_NAME:-run76-ffhq-1024-mirror}"
-export MODEL_DIR="${MODEL_DIR:-gs://dota-euw4a/runs/${RUN_NAME}/}"
+export MODEL_DIR="${MODEL_DIR:-gs://dota-euw4a/runs/${RUN_NAME}}"
 export BATCH_PER="${BATCH_PER:-3}"
 export BATCH_SIZE="${BATCH_SIZE:-$(($BATCH_PER * $cores))}"
 export SPATIAL_PARTITION_FACTOR="${SPATIAL_PARTITION_FACTOR:-2}"
