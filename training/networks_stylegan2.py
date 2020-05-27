@@ -700,9 +700,8 @@ def D_stylegan2(
             x = apply_bias_act(dense_layer(x, fmaps=nf(0)), act=act)
 
     with tf.variable_scope('Output'):
-        out_logit = apply_bias_act(dense_layer(x, fmaps=1))
-        out = tf.nn.sigmoid(out_logit)
-    scores_out = out
+        x = apply_bias_act(dense_layer(x, fmaps=1))
+    scores_out = x
 
     # Output.
     assert scores_out.dtype == tf.as_dtype(dtype)
