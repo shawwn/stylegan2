@@ -83,7 +83,7 @@ def get_tpu_summary(model_dir=None):
     global tpu_summary
     if tpu_summary is None:
         if model_dir is None:
-            model_dir = os.path.join(os.environ['MODEL_DIR'], 'autosummary')
+            model_dir = os.path.join(os.environ['MODEL_DIR'], 'summaries')
         tpu_summary = tpu_summaries.TpuSummaries(model_dir)
     else:
         assert model_dir is None
