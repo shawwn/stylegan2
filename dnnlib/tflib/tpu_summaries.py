@@ -63,20 +63,15 @@ class TpuSummaries(object):
   all the TPU cores.
   """
 
-  def __init__(self, log_dir, save_summary_steps=None):
-    experimental_host_call_every_n_steps = int(os.environ.get('HOST_CALL_EVERY_N_STEPS', '64'))
-    if save_summary_steps is None:
-      save_summary_steps = int(os.environ.get('SAVE_SUMMARY_STEPS', '32'))
-      if max(save_summary_steps, experimental_host_call_every_n_steps) % min(save_summary_steps, experimental_host_call_every_n_steps) != 0:
-        raise ValueError('SAVE_SUMMARY_STEPS({:!r}) must be modulo HOST_CALL_EVERY_N_STEPS({:!r})'.format(
-          save_summary_steps, experimental_host_call_every_n_steps))
-      save_summary_steps = max(save_summary_steps, experimental_host_call_every_n_steps)
+  def __init__(self, log_dir):
     self._log_dir = log_dir
     self._entries = []
     # While False no summary entries will be added. On TPU we unroll the graph
     # and don't want to add multiple summaries per step.
     self.record = True
-    self._save_summary_steps = save_summary_steps
+    # The save frequency is now controlled via HOST_CALL_EVERY_N_STEPS, so just
+    # save every tick. (One "tick" occurs every HOST_CALL_EVERY_N_STEPS.)
+    self._save_summary_steps = 1
 
   def image(self, name, tensor, reduce_fn):
     """Add a summary for images. Tensor must be of 4-D tensor."""
@@ -113,7 +108,7 @@ class TpuSummaries(object):
     tf.logging.info("host_call_fn: args=%s", args)
     with summary.create_file_writer(self._log_dir).as_default():
       with summary.record_summaries_every_n_global_steps(
-          self._save_summary_steps, step):
+          self._save_summary_steps, self._save_summary_steps): # always record, since we control this via HOST_CALL_EVERY_N_STEPS
         for i, e in enumerate(self._entries):
           value = e.reduce_fn(args[i])
           e.summary_fn(e.name, value, step=step)
