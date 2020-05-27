@@ -52,6 +52,7 @@ summary = tf.contrib.summary  # TensorFlow Summary API v2.
 TpuSummaryEntry = collections.namedtuple(
     "TpuSummaryEntry", "summary_fn name tensor reduce_fn")
 
+import os
 
 class TpuSummaries(object):
   """Class to simplify TF summaries on TPU.
@@ -62,7 +63,14 @@ class TpuSummaries(object):
   all the TPU cores.
   """
 
-  def __init__(self, log_dir, save_summary_steps=32):
+  def __init__(self, log_dir, save_summary_steps=None):
+    experimental_host_call_every_n_steps = int(os.environ.get('HOST_CALL_EVERY_N_STEPS', '64'))
+    if save_summary_steps is None:
+      save_summary_steps = int(os.environ.get('SAVE_SUMMARY_STEPS', '32'))
+      if max(save_summary_steps, experimental_host_call_every_n_steps) % min(save_summary_steps, experimental_host_call_every_n_steps) != 0:
+        raise ValueError('SAVE_SUMMARY_STEPS({:!r}) must be modulo HOST_CALL_EVERY_N_STEPS({:!r})'.format(
+          save_summary_steps, experimental_host_call_every_n_steps))
+      save_summary_steps = max(save_summary_steps, experimental_host_call_every_n_steps)
     self._log_dir = log_dir
     self._entries = []
     # While False no summary entries will be added. On TPU we unroll the graph

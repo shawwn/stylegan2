@@ -643,8 +643,8 @@ def training_loop(
     spatial_partition_factor = max(1, int(os.environ.get('SPATIAL_PARTITION_FACTOR', '1')))
     assert batch_size % (spatial_partition_factor * spatial_partition_factor) == 0
     batch_size //= spatial_partition_factor * spatial_partition_factor
-    experimental_host_call_every_n_steps = int(os.environ.get('HOST_CALL_EVERY_N_STEPS', '16'))
-    iterations_per_loop = int(os.environ.get('ITERATIONS_PER_LOOP', '64'))
+    experimental_host_call_every_n_steps = int(os.environ.get('HOST_CALL_EVERY_N_STEPS', '64'))
+    iterations_per_loop = int(os.environ.get('ITERATIONS_PER_LOOP', '256'))
     if spatial_partition_factor <= 1:
         tpu_config = tf.contrib.tpu.TPUConfig(
             iterations_per_loop=iterations_per_loop,
