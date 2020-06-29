@@ -152,7 +152,7 @@ def set_num_replicas(n):
 def _i(x): return tf.transpose(x, [0, 2, 3, 1])
 def _o(x): return tf.transpose(x, [0, 3, 1, 2])
 
-import tensorflow_gan as tfgan
+#import tensorflow_gan as tfgan
 
 def autofid(summary_name, reals, fakes):
     autoimages(summary_name+'/real', reals)
