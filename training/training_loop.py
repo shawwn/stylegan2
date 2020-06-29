@@ -553,7 +553,7 @@ def training_loop(
         if training_set.precalc:
             training_set.fake_latents = tf.random_normal([minibatch_gpu_in] + Gs.input_shapes[0][1:])
             training_set.fake_labels = training_set.get_random_labels_tf(minibatch_gpu_in)
-            training_set.fake_images = G.get_output_for(training_set.fake_latents, training_set.fake_labels, is_training=True)
+            training_set.fake_images, training_set.fake_dlatents = G.get_output_for(training_set.fake_latents, training_set.fake_labels, is_training=True, return_dlatents=True)
             training_set.fake_scores = D.get_output_for(training_set.fake_images, training_set.fake_labels, is_training=True)
             training_set.real_images = reals_read
             training_set.real_labels = labels_read

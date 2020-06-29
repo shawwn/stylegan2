@@ -205,6 +205,7 @@ def G_logistic_ns_pathreg(G, D, opt, training_set, minibatch_size, pl_minibatch_
     _ = opt
     if training_set.precalc:
         fake_images_out, fake_scores_out = training_set.fake_images, training_set.fake_scores
+        fake_dlatents_out = training_set.fake_dlatents
     else:
         latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
         labels = training_set.get_random_labels_tf(minibatch_size)
