@@ -624,10 +624,10 @@ def training_loop(
         with tf.control_dependencies([inc_global_step]):
             with tf.control_dependencies([G_train_op]):
                 with tf.control_dependencies([G_reg_train_op]):
-                    with tf.control_dependencies([D_train_op]):
+                    with tf.control_dependencies([D_train_op, Gs_update_op]):
                         with tf.control_dependencies([D_reg_train_op]):
                             with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-                                train_op = tf.group(Gs_update_op, name='train_op')
+                                train_op = tf.group(tf.no_op(), name='train_op')
         return tf.contrib.tpu.TPUEstimatorSpec(
             mode=mode,
             host_call = get_tpu_summary().get_host_call(),
