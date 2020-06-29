@@ -157,8 +157,10 @@ import tensorflow_gan as tfgan
 def autofid(summary_name, reals, fakes):
     autoimages(summary_name+'/real', reals)
     autoimages(summary_name+'/fake', fakes)
-    reals_in = tf.reshape(reals, tf.shape(reals)[0] + [-1])
-    fakes_in = tf.reshape(fakes, tf.shape(fakes)[0] + [-1])
+    N, C, H, W = reals.shape.as_list()
+    reals_in = tf.reshape(reals, [N][C * H * W])
+    N, C, H, W = fakes.shape.as_list()
+    fakes_in = tf.reshape(fakes, [N][C * H * W])
     fid = tfgan.eval.frechet_classifier_distance_from_activations_streaming(reals_in, fakes_in)
     autosummary(summary_name+'/fid', fid)
     return fid
