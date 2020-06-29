@@ -170,6 +170,8 @@ def autoimages(summary_name, images, grid_shape=None, res=None):
     """Called from model_fn() to add a grid of images as summary."""
     # convert from [batch, channels, width, height] to [batch, width, height, channels]
     images = _i(images)
+    if images.dtype == tf.float32 or images.dtype == tf.float64:
+        images = tf.clip_by_value(images, -1.0, 1.0)
     # All summary tensors are synced to host 0 on every step. To avoid sending
     # more images then needed we transfer at most `sampler_per_replica` to
     # create a 8x8 image grid.
