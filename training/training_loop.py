@@ -683,7 +683,7 @@ def training_loop(
         tpu_config=tpu_config)
     ws = None
     if 'WARM_START_CHECKPOINT_PATH' in os.environ:
-        ws_vars = os.environ['WARM_START_VARS_REGEX'] or ".*"
+        ws_vars = os.environ.get('WARM_START_VARS_REGEX', ".*")
         ws = tf.estimator.WarmStartSettings(
                 ckpt_to_initialize_from = os.environ['WARM_START_CHECKPOINT_PATH'],
                 vars_to_warm_start = ws_vars
