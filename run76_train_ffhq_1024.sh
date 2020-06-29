@@ -20,7 +20,7 @@ then
 fi
 
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-/tfk/lib}"
-export TPU_HOST="${TPU_HOST:-10.255.128.2}"
+export TPU_HOST="${TPU_HOST:-10.255.128.3}"
 export TPU_NAME="${TPU_NAME:-tpu-v3-512-euw4a-53}"
 cores="$(echo $TPU_NAME | sed 's/^tpu-v[23][-]\([0-9]*\).*$/\1/g')"
 if [ -z "$cores" ]
@@ -63,5 +63,5 @@ while true; do
   echo "Recreating $TPU_NAME in 30sec..."
   sleep 30
   # pip3 install tpunicorn
-  tpunicorn recreate "$TPU_NAME" --yes
+  #tpunicorn recreate "$TPU_NAME" --yes
 done
