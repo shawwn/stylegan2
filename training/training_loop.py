@@ -548,6 +548,13 @@ def training_loop(
         reals_read = features
         labels_read = labels
 
+        G_trainables = G_gpu.trainables 
+        D_trainables = D_gpu.trainables
+        if 'UNFREEZE_G_REGEX' in os.environ:
+            G_trainables = { k:v for k,v in G_gpu.trainables.items() if bool(re.search(os.environ['UNFREEZE_G_REGEX'], k)) }
+        if 'UNFREEZE_D_REGEX' in os.environ:
+            D_trainables = { k:v for k,v in D_gpu.trainables.items() if bool(re.search(os.environ['UNFREEZE_D_REGEX'], k)) }
+
         minibatch_gpu_in = params['batch_size']
         G_opt_args = dict(G_opt_args)
         D_opt_args = dict(D_opt_args)
@@ -573,35 +580,35 @@ def training_loop(
         else:
             if G_reg is not None: G_reg_loss = tf.reduce_mean(G_reg * G_reg_interval)
             if D_reg is not None: D_reg_loss = tf.reduce_mean(D_reg * D_reg_interval)
-            if G_reg is not None: G_reg_opt.register_gradients(G_reg_loss, G_gpu.trainables)
-            if D_reg is not None: D_reg_opt.register_gradients(D_reg_loss, D_gpu.trainables)
+            if G_reg is not None: G_reg_opt.register_gradients(G_reg_loss, G_trainables)
+            if D_reg is not None: D_reg_opt.register_gradients(D_reg_loss, D_trainables)
         G_loss_op = tf.reduce_mean(G_loss)
         D_loss_op = tf.reduce_mean(D_loss)
-        G_opt.register_gradients(G_loss_op, G_gpu.trainables)
-        D_opt.register_gradients(D_loss_op, D_gpu.trainables)
+        G_opt.register_gradients(G_loss_op, G_trainables)
+        D_opt.register_gradients(D_loss_op, D_trainables)
         inc_global_step = tf.assign_add(tf.train.get_or_create_global_step(), minibatch_gpu_in, name="inc_global_step")
-        G_train_op = G_opt._shared_optimizers[''].minimize(G_loss_op, var_list=G_gpu.trainables)
-        D_train_op = D_opt._shared_optimizers[''].minimize(D_loss_op, var_list=D_gpu.trainables)
+        G_train_op = G_opt._shared_optimizers[''].minimize(G_loss_op, var_list=G_trainables)
+        D_train_op = D_opt._shared_optimizers[''].minimize(D_loss_op, var_list=D_trainables)
         if lazy_regularization:
             if False:
                 G_reg_train_op = tf.cond(
                     lambda: tf.cast(tf.mod(tf.train.get_global_step(), G_reg_interval), tf.bool),
-                    lambda: G_reg_opt._shared_optimizers[''].minimize(G_reg_loss, var_list=G_gpu.trainables),
+                    lambda: G_reg_opt._shared_optimizers[''].minimize(G_reg_loss, var_list=G_trainables),
                     lambda: tf.no_op()) if G_reg_loss is not None else tf.no_op()
                 D_reg_train_op = tf.cond(
                     lambda: tf.cast(tf.mod(tf.train.get_global_step(), D_reg_interval), tf.bool),
-                    lambda: D_reg_opt._shared_optimizers[''].minimize(D_reg_loss, var_list=D_gpu.trainables),
+                    lambda: D_reg_opt._shared_optimizers[''].minimize(D_reg_loss, var_list=D_trainables),
                     lambda: tf.no_op()) if D_reg_loss is not None else tf.no_op()
             else:
                 assert (G_reg is not None)
                 assert (D_reg is not None)
                 def G_fn():
                     with tf.control_dependencies([tf.train.get_or_create_global_step()]):
-                        G_op = G_reg_opt._shared_optimizers[''].minimize(G_reg_loss, var_list=G_gpu.trainables)
+                        G_op = G_reg_opt._shared_optimizers[''].minimize(G_reg_loss, var_list=G_trainables)
                         return G_op
                 def D_fn():
                     with tf.control_dependencies([tf.train.get_or_create_global_step()]):
-                        D_op = D_reg_opt._shared_optimizers[''].minimize(D_reg_loss, var_list=D_gpu.trainables)
+                        D_op = D_reg_opt._shared_optimizers[''].minimize(D_reg_loss, var_list=D_trainables)
                         return D_op
                 def G_else():
                     with tf.control_dependencies([tf.train.get_or_create_global_step()]):
@@ -612,8 +619,8 @@ def training_loop(
                 G_reg_train_op = tf.cond(lambda: tf.equal(tf.mod(tf.train.get_or_create_global_step(), G_reg_interval), tf.constant(0, tf.int64)), G_fn, G_else)
                 D_reg_train_op = tf.cond(lambda: tf.equal(tf.mod(tf.train.get_or_create_global_step(), D_reg_interval), tf.constant(0, tf.int64)), D_fn, D_else)
         else:
-            G_reg_train_op = G_reg_opt._shared_optimizers[''].minimize(G_reg_loss, var_list=G_gpu.trainables) if G_reg_loss is not None else tf.no_op()
-            D_reg_train_op = D_reg_opt._shared_optimizers[''].minimize(D_reg_loss, var_list=D_gpu.trainables) if D_reg_loss is not None else tf.no_op()
+            G_reg_train_op = G_reg_opt._shared_optimizers[''].minimize(G_reg_loss, var_list=G_trainables) if G_reg_loss is not None else tf.no_op()
+            D_reg_train_op = D_reg_opt._shared_optimizers[''].minimize(D_reg_loss, var_list=D_trainables) if D_reg_loss is not None else tf.no_op()
 
         minibatch_size_in = batch_size
         Gs_beta              = 0.5 ** tf.div(tf.cast(minibatch_size_in, tf.float32), G_smoothing_kimg * 1000.0) if G_smoothing_kimg > 0.0 else 0.0
@@ -667,11 +674,19 @@ def training_loop(
         keep_checkpoint_every_n_hours=1,
         cluster=tpu_cluster_resolver,
         tpu_config=tpu_config)
+    ws = None
+    if 'WARM_START_CHECKPOINT_PATH' in os.environ:
+        ws_vars = os.environ['WARM_START_VARS_REGEX'] or ".*"
+        ws = tf.estimator.WarmStartSettings(
+                ckpt_to_initialize_from = os.environ['WARM_START_CHECKPOINT_PATH'],
+                vars_to_warm_start = ws_vars
+                )
     estimator = tf.contrib.tpu.TPUEstimator(
         config=run_config,
         use_tpu=use_tpu,
         model_fn=model_fn,
-        train_batch_size=batch_size)
+        train_batch_size=batch_size,
+        warm_start_from=ws)
     print('Training...')
     estimator.train(input_fn, steps=training_steps)
     import pdb; pdb.set_trace()
@@ -795,6 +810,14 @@ def training_loop(
             me.G_final.join()
             me.D_final.join()
 
+            G_trainables = G_gpu.trainables 
+            D_trainables = D_gpu.trainables
+            if 'UNFREEZE_G_REGEX' in os.environ:
+                G_trainables = { k:v for k,v in G_gpu.trainables.items() if bool(re.search(os.environ['UNFREEZE_G_REGEX'], k)) }
+            if 'UNFREEZE_D_REGEX' in os.environ:
+                D_trainables = { k:v for k,v in D_gpu.trainables.items() if bool(re.search(os.environ['UNFREEZE_D_REGEX'], k)) }
+
+
             tflex.break_next_run = (gpu > 0)
 
             # Fetch training data via temporary variables.
@@ -826,10 +849,10 @@ def training_loop(
                 if G_reg is not None: G_loss += G_reg
                 if D_reg is not None: D_loss += D_reg
             else:
-                if G_reg is not None: G_reg_opt.register_gradients(tf.reduce_mean(G_reg * G_reg_interval), G_gpu.trainables)
-                if D_reg is not None: D_reg_opt.register_gradients(tf.reduce_mean(D_reg * D_reg_interval), D_gpu.trainables)
-            G_opt.register_gradients(tf.reduce_mean(G_loss), G_gpu.trainables)
-            D_opt.register_gradients(tf.reduce_mean(D_loss), D_gpu.trainables)
+                if G_reg is not None: G_reg_opt.register_gradients(tf.reduce_mean(G_reg * G_reg_interval), G_trainables)
+                if D_reg is not None: D_reg_opt.register_gradients(tf.reduce_mean(D_reg * D_reg_interval), D_trainables)
+            G_opt.register_gradients(tf.reduce_mean(G_loss), G_trainables)
+            D_opt.register_gradients(tf.reduce_mean(D_loss), D_trainables)
     print('Making shards...')
     tflex.parallelize_verbose("Shard", range(num_gpus), make_shard, synchronous=True)
 
