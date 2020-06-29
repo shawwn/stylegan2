@@ -549,6 +549,15 @@ def training_loop(
         labels_read = labels
 
         minibatch_gpu_in = params['batch_size']
+        training_set.precalc = bool(int(os.environ.get('PRECALC', '1')))
+        if training_set.precalc:
+            training_set.fake_latents = tf.random_normal([minibatch_gpu_in] + Gs.input_shapes[0][1:])
+            training_set.fake_labels = training_set.get_random_labels_tf(minibatch_gpu_in)
+            training_set.fake_images = G.get_output_for(training_set.fake_latents, training_set.fake_labels, is_training=True)
+            training_set.fake_scores = D.get_output_for(training_set.fake_images, training_set.fake_labels, is_training=True)
+            training_set.real_images = reals_read
+            training_set.real_labels = labels_read
+            training_set.real_scores = D.get_output_for(training_set.real_images, training_set.real_labels, is_training=True)
         G_opt_args = dict(G_opt_args)
         D_opt_args = dict(D_opt_args)
         sched_args = dict(sched_args)
@@ -624,15 +633,18 @@ def training_loop(
         with tf.control_dependencies([inc_global_step]):
             with tf.control_dependencies([G_train_op]):
                 with tf.control_dependencies([G_reg_train_op]):
-                    with tf.control_dependencies([D_train_op]):
+                    with tf.control_dependencies([D_train_op, Gs_update_op]):
                         with tf.control_dependencies([D_reg_train_op]):
                             with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-                                latents = tf.random_normal([minibatch_gpu_in] + G.input_shapes[0][1:])
-                                labels = training_set.get_random_labels_tf(minibatch_gpu_in)
+                                if training_set.precalc:
+                                    latents, labels = training_set.fake_latents, training_set.fake_labels
+                                else:
+                                    latents = tf.random_normal([minibatch_gpu_in] + G.input_shapes[0][1:])
+                                    labels = training_set.get_random_labels_tf(minibatch_gpu_in)
                                 fakes = Gs.get_output_for(latents, labels, is_training=True)
                                 reals = reals_read
                                 autofid("Gs/images", reals, fakes)
-                                train_op = tf.group(Gs_update_op, name='train_op')
+                                train_op = tf.group([tf.no_op()], name='train_op')
         return tf.contrib.tpu.TPUEstimatorSpec(
             mode=mode,
             host_call = get_tpu_summary().get_host_call(),
