@@ -627,7 +627,8 @@ def training_loop(
                     with tf.control_dependencies([D_train_op]):
                         with tf.control_dependencies([D_reg_train_op]):
                             with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-                                latents = tf.random_normal([minibatch_size_in] + G.input_shapes[0][1:])
+                                latents = tf.random_normal([minibatch_gpu_in] + G.input_shapes[0][1:])
+                                labels = training_set.get_random_labels_tf(minibatch_gpu_in)
                                 fakes = Gs.get_output_for(latents, labels, is_training=True)
                                 reals = reals_read
                                 autofid("Gs/images", reals, fakes)
