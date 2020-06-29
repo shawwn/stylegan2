@@ -14,7 +14,7 @@ import time
 import dnnlib
 import dnnlib.tflib as tflib
 import traceback
-from dnnlib.tflib.autosummary import autosummary, get_tpu_summary, set_num_replicas
+from dnnlib.tflib.autosummary import autosummary, autofid, get_tpu_summary, set_num_replicas
 
 from training import dataset
 from training import misc
@@ -627,6 +627,10 @@ def training_loop(
                     with tf.control_dependencies([D_train_op]):
                         with tf.control_dependencies([D_reg_train_op]):
                             with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+                                latents = tf.random_normal([minibatch_size_in] + G.input_shapes[0][1:])
+                                fakes = Gs.get_output_for(latents, labels=labels, is_training=True)
+                                reals = reals_read
+                                autofid("Gs/images", reals, fakes)
                                 train_op = tf.group(Gs_update_op, name='train_op')
         return tf.contrib.tpu.TPUEstimatorSpec(
             mode=mode,

@@ -157,13 +157,14 @@ import tensorflow_gan as tfgan
 def autofid(summary_name, reals, fakes):
     autoimages(summary_name+'/real', reals)
     autoimages(summary_name+'/fake', fakes)
-    N, C, H, W = reals.shape.as_list()
-    reals_in = tf.reshape(reals, [N, C * H * W])
-    N, C, H, W = fakes.shape.as_list()
-    fakes_in = tf.reshape(fakes, [N, C * H * W])
-    fid = tfgan.eval.frechet_classifier_distance_from_activations_streaming(reals_in, fakes_in)
-    autosummary(summary_name+'/fid', fid)
-    return fid
+    if False:
+        N, C, H, W = reals.shape.as_list()
+        reals_in = tf.reshape(reals, [N, C * H * W])
+        N, C, H, W = fakes.shape.as_list()
+        fakes_in = tf.reshape(fakes, [N, C * H * W])
+        #fid = tfgan.eval.frechet_classifier_distance_from_activations_streaming(reals_in, fakes_in)
+        autosummary(summary_name+'/fid', fid)
+        return fid
 
 def autoimages(summary_name, images, grid_shape=None, res=None):
     """Called from model_fn() to add a grid of images as summary."""
