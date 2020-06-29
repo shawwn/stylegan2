@@ -555,10 +555,10 @@ def training_loop(
         G_opt = tflib.Optimizer(name='TrainG', cross_shard=True, learning_rate=sched_args['G_lrate_base'], **G_opt_args)
         D_opt = tflib.Optimizer(name='TrainD', cross_shard=True, learning_rate=sched_args['D_lrate_base'], **D_opt_args)
         with tf.name_scope('G_loss'):
-            G_loss, G_reg = dnnlib.util.call_func_by_name(G=G_gpu, D=D_gpu, opt=G_opt, training_set=training_set,
+            G_loss, G_reg = dnnlib.util.call_func_by_name(Gs=Gs, G=G_gpu, D=D_gpu, opt=G_opt, training_set=training_set,
                                                           minibatch_size=minibatch_gpu_in, **G_loss_args)
         with tf.name_scope('D_loss'):
-            D_loss, D_reg = dnnlib.util.call_func_by_name(G=G_gpu, D=D_gpu, opt=D_opt, training_set=training_set,
+            D_loss, D_reg = dnnlib.util.call_func_by_name(Gs=Gs, G=G_gpu, D=D_gpu, opt=D_opt, training_set=training_set,
                                                           minibatch_size=minibatch_gpu_in, reals=reals_read,
                                                           labels=labels_read, **D_loss_args)
 

@@ -15,7 +15,7 @@ from dnnlib.tflib.autosummary import autosummary, autoimages
 # Logistic loss from the paper
 # "Generative Adversarial Nets", Goodfellow et al. 2014
 
-def G_logistic(G, D, opt, training_set, minibatch_size):
+def G_logistic(Gs, G, D, opt, training_set, minibatch_size):
     _ = opt
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     labels = training_set.get_random_labels_tf(minibatch_size)
@@ -25,7 +25,7 @@ def G_logistic(G, D, opt, training_set, minibatch_size):
     autosummary('G_logistic_00/total_loss', loss)
     return loss, None
 
-def G_logistic_ns(G, D, opt, training_set, minibatch_size):
+def G_logistic_ns(Gs, G, D, opt, training_set, minibatch_size):
     _ = opt
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     labels = training_set.get_random_labels_tf(minibatch_size)
@@ -35,7 +35,7 @@ def G_logistic_ns(G, D, opt, training_set, minibatch_size):
     autosummary('G_logistic_ns_00/total_loss', loss)
     return loss, None
 
-def D_logistic(G, D, opt, training_set, minibatch_size, reals, labels):
+def D_logistic(Gs, G, D, opt, training_set, minibatch_size, reals, labels):
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
@@ -48,13 +48,15 @@ def D_logistic(G, D, opt, training_set, minibatch_size, reals, labels):
     autosummary('D_logistic_02/total_loss', loss)
     autoimages('D_logistic/images/real', reals)
     autoimages('D_logistic/images/fake', fake_images_out)
+    fake_images_Gs = Gs.get_output_for(latents, labels, is_training=True, randomize_noise=False)
+    autoimages('D_logistic/images/fake_Gs', fake_images_Gs)
     return loss, None
 
 #----------------------------------------------------------------------------
 # R1 and R2 regularizers from the paper
 # "Which Training Methods for GANs do actually Converge?", Mescheder et al. 2018
 
-def D_logistic_r1(G, D, opt, training_set, minibatch_size, reals, labels, gamma=10.0):
+def D_logistic_r1(Gs, G, D, opt, training_set, minibatch_size, reals, labels, gamma=10.0):
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
@@ -73,9 +75,11 @@ def D_logistic_r1(G, D, opt, training_set, minibatch_size, reals, labels, gamma=
     autosummary('D_logistic_r1_03/total_loss', loss + reg)
     autoimages('D_logistic_r1/images/real', reals)
     autoimages('D_logistic_r1/images/fake', fake_images_out)
+    fake_images_Gs = Gs.get_output_for(latents, labels, is_training=True, randomize_noise=False)
+    autoimages('D_logistic_r1/images/fake_Gs', fake_images_Gs)
     return loss, reg
 
-def D_logistic_r2(G, D, opt, training_set, minibatch_size, reals, labels, gamma=10.0):
+def D_logistic_r2(Gs, G, D, opt, training_set, minibatch_size, reals, labels, gamma=10.0):
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
@@ -94,13 +98,15 @@ def D_logistic_r2(G, D, opt, training_set, minibatch_size, reals, labels, gamma=
     autosummary('D_logistic_r2_03/total_loss', loss + reg)
     autoimages('D_logistic_r2/images/real', reals)
     autoimages('D_logistic_r2/images/fake', fake_images_out)
+    fake_images_Gs = Gs.get_output_for(latents, labels, is_training=True, randomize_noise=False)
+    autoimages('D_logistic_r2/images/fake_Gs', fake_images_Gs)
     return loss, reg
 
 #----------------------------------------------------------------------------
 # WGAN loss from the paper
 # "Wasserstein Generative Adversarial Networks", Arjovsky et al. 2017
 
-def G_wgan(G, D, opt, training_set, minibatch_size):
+def G_wgan(Gs, G, D, opt, training_set, minibatch_size):
     _ = opt
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     labels = training_set.get_random_labels_tf(minibatch_size)
@@ -110,7 +116,7 @@ def G_wgan(G, D, opt, training_set, minibatch_size):
     autosummary('G_wgan_00/total_loss', loss)
     return loss, None
 
-def D_wgan(G, D, opt, training_set, minibatch_size, reals, labels, wgan_epsilon=0.001):
+def D_wgan(Gs, G, D, opt, training_set, minibatch_size, reals, labels, wgan_epsilon=0.001):
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
@@ -126,13 +132,15 @@ def D_wgan(G, D, opt, training_set, minibatch_size, reals, labels, wgan_epsilon=
     autosummary('D_wgan_03/total_loss', loss)
     autoimages('D_wgan/images/real', reals)
     autoimages('D_wgan/images/fake', fake_images_out)
+    fake_images_Gs = Gs.get_output_for(latents, labels, is_training=True, randomize_noise=False)
+    autoimages('D_wgan/images/fake_Gs', fake_images_Gs)
     return loss, None
 
 #----------------------------------------------------------------------------
 # WGAN-GP loss from the paper
 # "Improved Training of Wasserstein GANs", Gulrajani et al. 2017
 
-def D_wgan_gp(G, D, opt, training_set, minibatch_size, reals, labels, wgan_lambda=10.0, wgan_epsilon=0.001, wgan_target=1.0):
+def D_wgan_gp(Gs, G, D, opt, training_set, minibatch_size, reals, labels, wgan_lambda=10.0, wgan_epsilon=0.001, wgan_target=1.0):
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
@@ -161,13 +169,15 @@ def D_wgan_gp(G, D, opt, training_set, minibatch_size, reals, labels, wgan_lambd
     autosummary('D_wgan_gp_04/total_loss', loss + reg)
     autoimages('D_wgan_gp/images/real', reals)
     autoimages('D_wgan_gp/images/fake', fake_images_out)
+    fake_images_Gs = Gs.get_output_for(latents, labels, is_training=True, randomize_noise=False)
+    autoimages('D_wgan_gp/images/fake_Gs', fake_images_Gs)
     return loss, reg
 
 #----------------------------------------------------------------------------
 # Non-saturating logistic loss with path length regularizer from the paper
 # "Analyzing and Improving the Image Quality of StyleGAN", Karras et al. 2019
 
-def G_logistic_ns_pathreg(G, D, opt, training_set, minibatch_size, pl_minibatch_shrink=2, pl_decay=0.01, pl_weight=2.0):
+def G_logistic_ns_pathreg(Gs, G, D, opt, training_set, minibatch_size, pl_minibatch_shrink=2, pl_decay=0.01, pl_weight=2.0):
     _ = opt
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     labels = training_set.get_random_labels_tf(minibatch_size)
