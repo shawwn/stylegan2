@@ -152,6 +152,15 @@ def set_num_replicas(n):
 def _i(x): return tf.transpose(x, [0, 2, 3, 1])
 def _o(x): return tf.transpose(x, [0, 3, 1, 2])
 
+import tensorflow_gan as tfgan
+
+def autofid(summary_name, reals, fakes):
+    autoimages(summary_name+'/real', reals)
+    autoimages(summary_name+'/fake', fakes)
+    fid = tfgan.eval.frechet_classifier_distance_from_activations_streaming(reals, fakes)
+    autosummary(summary_name+'/fid', fid)
+    return fid
+
 def autoimages(summary_name, images, grid_shape=None, res=None):
     """Called from model_fn() to add a grid of images as summary."""
     # convert from [batch, channels, width, height] to [batch, width, height, channels]

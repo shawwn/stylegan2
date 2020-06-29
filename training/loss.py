@@ -9,7 +9,7 @@
 import numpy as np
 import tensorflow as tf
 import dnnlib.tflib as tflib
-from dnnlib.tflib.autosummary import autosummary, autoimages
+from dnnlib.tflib.autosummary import autosummary, autoimages, autofid
 
 #----------------------------------------------------------------------------
 # Logistic loss from the paper
@@ -46,8 +46,7 @@ def D_logistic(G, D, opt, training_set, minibatch_size, reals, labels):
     loss = autosummary('D_logistic_00/fake_loss', tf.nn.softplus(fake_scores_out)) # -log(1-sigmoid(fake_scores_out))
     loss += autosummary('D_logistic_01/real_loss', tf.nn.softplus(-real_scores_out)) # -log(sigmoid(real_scores_out)) # pylint: disable=invalid-unary-operand-type
     autosummary('D_logistic_02/total_loss', loss)
-    autoimages('D_logistic/images/real', reals)
-    autoimages('D_logistic/images/fake', fake_images_out)
+    autofid('D_logistic/images', reals, fake_images_out)
     return loss, None
 
 #----------------------------------------------------------------------------
@@ -71,8 +70,7 @@ def D_logistic_r1(G, D, opt, training_set, minibatch_size, reals, labels, gamma=
         reg = gradient_penalty * (gamma * 0.5)
         autosummary('D_logistic_r1_02/reg_loss', reg)
     autosummary('D_logistic_r1_03/total_loss', loss + reg)
-    autoimages('D_logistic_r1/images/real', reals)
-    autoimages('D_logistic_r1/images/fake', fake_images_out)
+    autofid('D_logistic_r1/images', reals, fake_images_out)
     return loss, reg
 
 def D_logistic_r2(G, D, opt, training_set, minibatch_size, reals, labels, gamma=10.0):
@@ -92,8 +90,7 @@ def D_logistic_r2(G, D, opt, training_set, minibatch_size, reals, labels, gamma=
         reg = gradient_penalty * (gamma * 0.5)
         autosummary('D_logistic_r2_02/reg_loss', reg)
     autosummary('D_logistic_r2_03/total_loss', loss + reg)
-    autoimages('D_logistic_r2/images/real', reals)
-    autoimages('D_logistic_r2/images/fake', fake_images_out)
+    autofid('D_logistic_r2/images', reals, fake_images_out)
     return loss, reg
 
 #----------------------------------------------------------------------------
@@ -124,8 +121,7 @@ def D_wgan(G, D, opt, training_set, minibatch_size, reals, labels, wgan_epsilon=
         epsilon_penalty = autosummary('D_wgan_02/epsilon_penalty', tf.square(real_scores_out))
         loss += autosummary('D_wgan_02/penalty_loss', epsilon_penalty * wgan_epsilon)
     autosummary('D_wgan_03/total_loss', loss)
-    autoimages('D_wgan/images/real', reals)
-    autoimages('D_wgan/images/fake', fake_images_out)
+    autofid('D_wgan/images', reals, fake_images_out)
     return loss, None
 
 #----------------------------------------------------------------------------
@@ -159,8 +155,7 @@ def D_wgan_gp(G, D, opt, training_set, minibatch_size, reals, labels, wgan_lambd
         autosummary('D_wgan_gp_03/gradient_penalty', gradient_penalty)
         autosummary('D_wgan_gp_03/reg_loss', reg)
     autosummary('D_wgan_gp_04/total_loss', loss + reg)
-    autoimages('D_wgan_gp/images/real', reals)
-    autoimages('D_wgan_gp/images/fake', fake_images_out)
+    autofid('D_wgan_gp/images', reals, fake_images_out)
     return loss, reg
 
 #----------------------------------------------------------------------------
