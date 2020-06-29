@@ -20,6 +20,7 @@ from training import dataset
 from training import misc
 from metrics import metric_base
 from pprint import pprint
+import re
 
 #----------------------------------------------------------------------------
 # Just-in-time processing of training images before feeding them to the networks.
@@ -551,9 +552,15 @@ def training_loop(
         G_trainables = G_gpu.trainables 
         D_trainables = D_gpu.trainables
         if 'UNFREEZE_G_REGEX' in os.environ:
+            print('UNFREEZE_G_REGEX={!r}'.format(os.environ['UNFREEZE_G_REGEX']))
+            print('G_trainables:')
             G_trainables = { k:v for k,v in G_gpu.trainables.items() if bool(re.search(os.environ['UNFREEZE_G_REGEX'], k)) }
+            pprint(G_trainables)
         if 'UNFREEZE_D_REGEX' in os.environ:
+            print('UNFREEZE_D_REGEX={!r}'.format(os.environ['UNFREEZE_D_REGEX']))
+            print('D_trainables:')
             D_trainables = { k:v for k,v in D_gpu.trainables.items() if bool(re.search(os.environ['UNFREEZE_D_REGEX'], k)) }
+            pprint(D_trainables)
 
         minibatch_gpu_in = params['batch_size']
         G_opt_args = dict(G_opt_args)
