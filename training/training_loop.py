@@ -684,6 +684,10 @@ def training_loop(
     ws = None
     if 'WARM_START_CHECKPOINT_PATH' in os.environ:
         ws_ckpt = os.environ['WARM_START_CHECKPOINT_PATH']
+        ws_ckpt = tf.train.latest_checkpoint(ws_ckpt)
+        if ws_ckpt is None:
+            raise ValueError("tf.train.latest_checkpoint({!r}) is None. Is WARM_START_CHECKPOINT_PATH correct?".format(
+                os.environ['WARM_START_CHECKPOINT_PATH']))
         ws_vars = os.environ.get('WARM_START_VARS_REGEX', ".*")
         if ',' in ws_vars:
             ws_vars = ws_vars.split(',')
