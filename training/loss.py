@@ -13,19 +13,21 @@ from dnnlib.tflib.autosummary import autosummary, autoimages
 from training import aug
 import os
 
-def image_augment(images):
+def image_augment(images, batch_shrink=1):
     # a bit of a hack to avoid "Second-order gradient for while loops not supported"
-    batch_per = int(os.environ['BATCH_PER']) if 'BATCH_PER' in os.environ else 1
-    return aug.tf_image_augment(images, data_format="NCHW", static_batch=batch_per)
+    batch_size = int(os.environ['BATCH_PER']) if 'BATCH_PER' in os.environ else 1
+    batch_size //= batch_shrink
+    batch_size = max(1, batch_size)
+    return aug.tf_image_augment(images, data_format="NCHW", static_batch=batch_size)
 
-def G_get_output_for(G, latents, labels, **kwargs):
+def G_get_output_for(G, latents, labels, *, batch_shrink=1, **kwargs):
     out = G.get_output_for(latents, labels, **kwargs)
-    out = image_augment(out)
+    out = image_augment(out, batch_shrink=batch_shrink)
     return out
 
-def G_get_output_for_dlatents(G, latents, labels, **kwargs):
+def G_get_output_for_dlatents(G, latents, labels, *, batch_shrink=1, **kwargs):
     out, dlatents = G.get_output_for(latents, labels, **kwargs, return_dlatents=True)
-    out = image_augment(out)
+    out = image_augment(out, batch_shrink=batch_shrink)
     return out, dlatents
 
 def D_get_output_for(D, images, labels, **kwargs):
@@ -221,7 +223,7 @@ def G_logistic_ns_pathreg(Gs, G, D, opt, training_set, minibatch_size, pl_miniba
             pl_minibatch = tf.maximum(1, minibatch_size // pl_minibatch_shrink)
             pl_latents = tf.random_normal([pl_minibatch] + G.input_shapes[0][1:])
             pl_labels = training_set.get_random_labels_tf(pl_minibatch)
-            fake_images_out, fake_dlatents_out = G_get_output_for_dlatents(G, pl_latents, pl_labels, is_training=True)
+            fake_images_out, fake_dlatents_out = G_get_output_for_dlatents(G, pl_latents, pl_labels, is_training=True, batch_shrink=pl_minibatch_shrink)
 
         # Compute |J*y|.
         pl_noise = tf.random_normal(tf.shape(fake_images_out)) / np.sqrt(np.prod(G.output_shape[2:]))
