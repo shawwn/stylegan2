@@ -10,6 +10,17 @@ import numpy as np
 import tensorflow as tf
 import dnnlib.tflib as tflib
 from dnnlib.tflib.autosummary import autosummary, autoimages
+from training import aug
+
+def G_get_output_for(G, latents, labels, **kwargs):
+    out = G.get_output_for(latents, labels, **kwargs)
+    out = aug.tf_image_augment(out)
+    return out
+
+def D_get_output_for(D, latents, labels, **kwargs):
+    out = D.get_output_for(latents, labels, **kwargs)
+    out = aug.tf_image_augment(out)
+    return out
 
 #----------------------------------------------------------------------------
 # Logistic loss from the paper
@@ -19,8 +30,8 @@ def G_logistic(Gs, G, D, opt, training_set, minibatch_size):
     _ = opt
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     labels = training_set.get_random_labels_tf(minibatch_size)
-    fake_images_out = G.get_output_for(latents, labels, is_training=True)
-    fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
+    fake_images_out = G_get_output_for(G, latents, labels, is_training=True)
+    fake_scores_out = D_get_output_for(D, fake_images_out, labels, is_training=True)
     loss = -tf.nn.softplus(fake_scores_out) # log(1-sigmoid(fake_scores_out)) # pylint: disable=invalid-unary-operand-type
     autosummary('G_logistic_00/total_loss', loss)
     return loss, None
@@ -29,8 +40,8 @@ def G_logistic_ns(Gs, G, D, opt, training_set, minibatch_size):
     _ = opt
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     labels = training_set.get_random_labels_tf(minibatch_size)
-    fake_images_out = G.get_output_for(latents, labels, is_training=True)
-    fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
+    fake_images_out = G_get_output_for(G, latents, labels, is_training=True)
+    fake_scores_out = D_get_output_for(D, fake_images_out, labels, is_training=True)
     loss = tf.nn.softplus(-fake_scores_out) # -log(sigmoid(fake_scores_out))
     autosummary('G_logistic_ns_00/total_loss', loss)
     return loss, None
@@ -38,9 +49,9 @@ def G_logistic_ns(Gs, G, D, opt, training_set, minibatch_size):
 def D_logistic(Gs, G, D, opt, training_set, minibatch_size, reals, labels):
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
-    fake_images_out = G.get_output_for(latents, labels, is_training=True)
-    real_scores_out = D.get_output_for(reals, labels, is_training=True)
-    fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
+    fake_images_out = G_get_output_for(G, latents, labels, is_training=True)
+    real_scores_out = D_get_output_for(D, reals, labels, is_training=True)
+    fake_scores_out = D_get_output_for(D, fake_images_out, labels, is_training=True)
     real_scores_out = autosummary('D_logistic_00/real_scores', real_scores_out)
     fake_scores_out = autosummary('D_logistic_01/fake_scores', fake_scores_out)
     loss = autosummary('D_logistic_00/fake_loss', tf.nn.softplus(fake_scores_out)) # -log(1-sigmoid(fake_scores_out))
@@ -59,9 +70,9 @@ def D_logistic(Gs, G, D, opt, training_set, minibatch_size, reals, labels):
 def D_logistic_r1(Gs, G, D, opt, training_set, minibatch_size, reals, labels, gamma=10.0):
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
-    fake_images_out = G.get_output_for(latents, labels, is_training=True)
-    real_scores_out = D.get_output_for(reals, labels, is_training=True)
-    fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
+    fake_images_out = G_get_output_for(G, latents, labels, is_training=True)
+    real_scores_out = D_get_output_for(D, reals, labels, is_training=True)
+    fake_scores_out = D_get_output_for(D, fake_images_out, labels, is_training=True)
     fake_scores_out = autosummary('D_logistic_r1_00/fake_scores', fake_scores_out)
     real_scores_out = autosummary('D_logistic_r1_01/real_scores', real_scores_out)
     loss = autosummary('D_logistic_r1_00/fake_loss', tf.nn.softplus(fake_scores_out)) # -log(1-sigmoid(fake_scores_out))
@@ -82,9 +93,9 @@ def D_logistic_r1(Gs, G, D, opt, training_set, minibatch_size, reals, labels, ga
 def D_logistic_r2(Gs, G, D, opt, training_set, minibatch_size, reals, labels, gamma=10.0):
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
-    fake_images_out = G.get_output_for(latents, labels, is_training=True)
-    real_scores_out = D.get_output_for(reals, labels, is_training=True)
-    fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
+    fake_images_out = G_get_output_for(G, latents, labels, is_training=True)
+    real_scores_out = D_get_output_for(D, reals, labels, is_training=True)
+    fake_scores_out = D_get_output_for(D, fake_images_out, labels, is_training=True)
     fake_scores_out = autosummary('D_logistic_r2_00/fake_scores', fake_scores_out)
     real_scores_out = autosummary('D_logistic_r2_01/real_scores', real_scores_out)
     loss = autosummary('D_logistic_r2_00/fake_loss', tf.nn.softplus(fake_scores_out)) # -log(1-sigmoid(fake_scores_out))
@@ -110,8 +121,8 @@ def G_wgan(Gs, G, D, opt, training_set, minibatch_size):
     _ = opt
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     labels = training_set.get_random_labels_tf(minibatch_size)
-    fake_images_out = G.get_output_for(latents, labels, is_training=True)
-    fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
+    fake_images_out = G_get_output_for(G, latents, labels, is_training=True)
+    fake_scores_out = D_get_output_for(D, fake_images_out, labels, is_training=True)
     loss = -fake_scores_out
     autosummary('G_wgan_00/total_loss', loss)
     return loss, None
@@ -119,9 +130,9 @@ def G_wgan(Gs, G, D, opt, training_set, minibatch_size):
 def D_wgan(Gs, G, D, opt, training_set, minibatch_size, reals, labels, wgan_epsilon=0.001):
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
-    fake_images_out = G.get_output_for(latents, labels, is_training=True)
-    real_scores_out = D.get_output_for(reals, labels, is_training=True)
-    fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
+    fake_images_out = G_get_output_for(G, latents, labels, is_training=True)
+    real_scores_out = D_get_output_for(D, reals, labels, is_training=True)
+    fake_scores_out = D_get_output_for(D, fake_images_out, labels, is_training=True)
     fake_scores_out = autosummary('D_wgan_00/fake_score', fake_scores_out)
     real_scores_out = autosummary('D_wgan_01/real_score', real_scores_out)
     loss = autosummary('D_wgan_00/fake_loss', fake_scores_out)
@@ -143,9 +154,9 @@ def D_wgan(Gs, G, D, opt, training_set, minibatch_size, reals, labels, wgan_epsi
 def D_wgan_gp(Gs, G, D, opt, training_set, minibatch_size, reals, labels, wgan_lambda=10.0, wgan_epsilon=0.001, wgan_target=1.0):
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
-    fake_images_out = G.get_output_for(latents, labels, is_training=True)
-    real_scores_out = D.get_output_for(reals, labels, is_training=True)
-    fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
+    fake_images_out = G_get_output_for(G, latents, labels, is_training=True)
+    real_scores_out = D_get_output_for(D, reals, labels, is_training=True)
+    fake_scores_out = D_get_output_for(D, fake_images_out, labels, is_training=True)
     fake_scores_out = autosummary('D_wgan_gp_00/fake_scores', fake_scores_out)
     real_scores_out = autosummary('D_wgan_gp_01/real_scores', real_scores_out)
     loss = autosummary('D_wgan_gp_00/fake_loss', fake_scores_out)
@@ -157,7 +168,7 @@ def D_wgan_gp(Gs, G, D, opt, training_set, minibatch_size, reals, labels, wgan_l
     with tf.name_scope('GradientPenalty'):
         mixing_factors = tf.random_uniform([minibatch_size, 1, 1, 1], 0.0, 1.0, dtype=fake_images_out.dtype)
         mixed_images_out = tflib.lerp(tf.cast(reals, fake_images_out.dtype), fake_images_out, mixing_factors)
-        mixed_scores_out = D.get_output_for(mixed_images_out, labels, is_training=True)
+        mixed_scores_out = D_get_output_for(D, mixed_images_out, labels, is_training=True)
         mixed_scores_out = autosummary('D_wgan_gp_03/mixed_scores', mixed_scores_out)
         mixed_grads = tf.gradients(tf.reduce_sum(mixed_scores_out), [mixed_images_out])[0]
         mixed_norms = tf.sqrt(tf.reduce_sum(tf.square(mixed_grads), axis=[1,2,3]))
@@ -181,8 +192,8 @@ def G_logistic_ns_pathreg(Gs, G, D, opt, training_set, minibatch_size, pl_miniba
     _ = opt
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     labels = training_set.get_random_labels_tf(minibatch_size)
-    fake_images_out, fake_dlatents_out = G.get_output_for(latents, labels, is_training=True, return_dlatents=True)
-    fake_scores_out = D.get_output_for(fake_images_out, labels, is_training=True)
+    fake_images_out, fake_dlatents_out = G_get_output_for(G, latents, labels, is_training=True, return_dlatents=True)
+    fake_scores_out = D_get_output_for(D, fake_images_out, labels, is_training=True)
     autosummary('G_logistic_ns_pathreg_00/fake_scores', fake_scores_out)
     loss = tf.nn.softplus(-fake_scores_out) # -log(sigmoid(fake_scores_out))
     autosummary('G_logistic_ns_pathreg_00/fake_loss', loss)
@@ -195,7 +206,7 @@ def G_logistic_ns_pathreg(Gs, G, D, opt, training_set, minibatch_size, pl_miniba
             pl_minibatch = tf.maximum(1, minibatch_size // pl_minibatch_shrink)
             pl_latents = tf.random_normal([pl_minibatch] + G.input_shapes[0][1:])
             pl_labels = training_set.get_random_labels_tf(pl_minibatch)
-            fake_images_out, fake_dlatents_out = G.get_output_for(pl_latents, pl_labels, is_training=True, return_dlatents=True)
+            fake_images_out, fake_dlatents_out = G_get_output_for(G, pl_latents, pl_labels, is_training=True, return_dlatents=True)
 
         # Compute |J*y|.
         pl_noise = tf.random_normal(tf.shape(fake_images_out)) / np.sqrt(np.prod(G.output_shape[2:]))
