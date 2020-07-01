@@ -29,7 +29,7 @@ then
   exit 1
 fi
 export IMAGENET_TFRECORD_DATASET="${IMAGENET_TFRECORD_DATASET:-gs://dota-euw4a/datasets/poc-ft-ds/poc-ft-ds-0*}"
-export RUN_NAME="${RUN_NAME:-run79-poc-ft-ds-mirror}"
+export RUN_NAME="${RUN_NAME:-run79b-poc-ft-ds-mirror}"
 export MODEL_DIR="${MODEL_DIR:-gs://dota-euw4a/runs/${RUN_NAME}}"
 export BATCH_PER="${BATCH_PER:-4}"
 export BATCH_SIZE="${BATCH_SIZE:-$(($BATCH_PER * $cores))}"
