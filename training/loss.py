@@ -14,12 +14,12 @@ from training import aug
 
 def G_get_output_for(G, latents, labels, **kwargs):
     out = G.get_output_for(latents, labels, **kwargs)
-    out = aug.tf_image_augment(out)
+    out = aug.tf_image_augment(out, data_format="NCHW")
     return out
 
 def D_get_output_for(D, latents, labels, **kwargs):
     out = D.get_output_for(latents, labels, **kwargs)
-    out = aug.tf_image_augment(out)
+    out = aug.tf_image_augment(out, data_format="NCHW")
     return out
 
 #----------------------------------------------------------------------------
