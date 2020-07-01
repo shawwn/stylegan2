@@ -11,9 +11,12 @@ import tensorflow as tf
 import dnnlib.tflib as tflib
 from dnnlib.tflib.autosummary import autosummary, autoimages
 from training import aug
+import os
 
 def image_augment(images):
-    return aug.tf_image_augment(images, data_format="NCHW")
+    # a bit of a hack to avoid "Second-order gradient for while loops not supported"
+    batch_per = int(os.environ['BATCH_PER']) if 'BATCH_PER' in os.environ else 1
+    return aug.tf_image_augment(images, data_format="NCHW", static_batch=batch_per)
 
 def G_get_output_for(G, latents, labels, **kwargs):
     out = G.get_output_for(latents, labels, **kwargs)

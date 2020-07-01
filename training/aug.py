@@ -45,13 +45,17 @@ def iround(u):
 
 
 @op_scope
-def tf_image_translate(images, x_offset, y_offset, data_format="NHWC", wrap_mode="reflect"):
+def tf_image_translate(images, x_offset, y_offset, data_format="NHWC", wrap_mode="reflect", static_batch=None):
   assert data_format in ["NHWC", "NCHW"]
   if data_format == "NCHW":
     images = tf.transpose(images, [0, 2, 3, 1]) # NCHW to NHWC
-  def thunk(args):
-    return [tf_image_translate_1(*args, data_format="NHWC", wrap_mode=wrap_mode)] + args[1:]
-  out, _, _ = tf.map_fn(thunk, [images, x_offset, y_offset])
+  if static_batch is not None:
+    out = [tf_image_translate_1(images[i], x_offset[i], y_offset[i]) for i in range(static_batch)]
+    out = tf.stack(out)
+  else:
+    def thunk(args):
+      return [tf_image_translate_1(*args, data_format="NHWC", wrap_mode=wrap_mode)] + args[1:]
+    out, _, _ = tf.map_fn(thunk, [images, x_offset, y_offset])
   if data_format == "NCHW":
     out = tf.transpose(out, [0, 3, 1, 2]) # NHWC to NCHW
   return out
@@ -97,15 +101,15 @@ def tf_image_translate_1(img, x_offset, y_offset, data_format="NHWC", wrap_mode=
 
 
 @op_scope
-def tf_random_translate(imgs, x_strength=0.5, y_strength=0.5, data_format="NHWC", wrap_mode="reflect"):
+def tf_random_translate(imgs, x_strength=0.5, y_strength=0.5, data_format="NHWC", wrap_mode="reflect", static_batch=None):
   shape = [tf.shape(imgs)[0]]
   x_offset = tf.random.uniform(shape, minval=-x_strength, maxval=x_strength)
   y_offset = tf.random.uniform(shape, minval=-y_strength, maxval=y_strength)
-  return tf_image_translate(imgs, x_offset, y_offset, data_format=data_format, wrap_mode=wrap_mode)
+  return tf_image_translate(imgs, x_offset, y_offset, data_format=data_format, wrap_mode=wrap_mode, static_batch=static_batch)
 
 
 @op_scope
-def tf_image_augment(imgs, data_format="NHWC"):
-  imgs = tf_random_translate(imgs, data_format=data_format)
+def tf_image_augment(imgs, data_format="NHWC", static_batch=None):
+  imgs = tf_random_translate(imgs, data_format=data_format, static_batch=static_batch)
   return imgs
 
