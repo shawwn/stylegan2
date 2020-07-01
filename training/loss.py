@@ -17,6 +17,11 @@ def G_get_output_for(G, latents, labels, **kwargs):
     out = aug.tf_image_augment(out, data_format="NCHW")
     return out
 
+def G_get_output_for_dlatents(G, latents, labels, **kwargs):
+    out, dlatents = G.get_output_for(latents, labels, **kwargs, return_dlatents=True)
+    out = aug.tf_image_augment(out, data_format="NCHW")
+    return out, dlatents
+
 def D_get_output_for(D, latents, labels, **kwargs):
     out = D.get_output_for(latents, labels, **kwargs)
     out = aug.tf_image_augment(out, data_format="NCHW")
@@ -192,7 +197,7 @@ def G_logistic_ns_pathreg(Gs, G, D, opt, training_set, minibatch_size, pl_miniba
     _ = opt
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     labels = training_set.get_random_labels_tf(minibatch_size)
-    fake_images_out, fake_dlatents_out = G_get_output_for(G, latents, labels, is_training=True, return_dlatents=True)
+    fake_images_out, fake_dlatents_out = G_get_output_for_dlatents(G, latents, labels, is_training=True)
     fake_scores_out = D_get_output_for(D, fake_images_out, labels, is_training=True)
     autosummary('G_logistic_ns_pathreg_00/fake_scores', fake_scores_out)
     loss = tf.nn.softplus(-fake_scores_out) # -log(sigmoid(fake_scores_out))
@@ -206,7 +211,7 @@ def G_logistic_ns_pathreg(Gs, G, D, opt, training_set, minibatch_size, pl_miniba
             pl_minibatch = tf.maximum(1, minibatch_size // pl_minibatch_shrink)
             pl_latents = tf.random_normal([pl_minibatch] + G.input_shapes[0][1:])
             pl_labels = training_set.get_random_labels_tf(pl_minibatch)
-            fake_images_out, fake_dlatents_out = G_get_output_for(G, pl_latents, pl_labels, is_training=True, return_dlatents=True)
+            fake_images_out, fake_dlatents_out = G_get_output_for_dlatents(G, pl_latents, pl_labels, is_training=True)
 
         # Compute |J*y|.
         pl_noise = tf.random_normal(tf.shape(fake_images_out)) / np.sqrt(np.prod(G.output_shape[2:]))
