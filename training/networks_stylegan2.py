@@ -432,19 +432,25 @@ def G_synthesis_stylegan2(
     fmap_min            = 1,            # Minimum number of feature maps in any layer.
     fmap_max            = 512,          # Maximum number of feature maps in any layer.
     randomize_noise     = True,         # True = randomize noise inputs every time (non-deterministic), False = read noise inputs from variables.
-    architecture        = 'skip',       # Architecture: 'orig', 'skip', 'resnet'.
+    architecture        = None,         # Architecture: 'orig', 'skip', 'resnet'.
     nonlinearity        = 'lrelu',      # Activation function: 'relu', 'lrelu', etc.
     dtype               = 'float32',    # Data type to use for activations and outputs.
     resample_kernel     = [1,3,3,1],    # Low-pass filter to apply when resampling activations. None = no filtering.
     fused_modconv       = True,         # Implement modulated_conv2d_layer() as a single fused op?
     **_kwargs):                         # Ignore unrecognized keyword args.
 
+    if architecture is None:
+        architecture = os.environ.get('G_SYNTHESIS_STYLEGAN2_ARCHITECTURE', 'skip')
+
+    if isinstance(architecture, str):
+        architecture = architecture.split(',')
+
     num_channels = int(os.environ["NUM_CHANNELS"]) if "NUM_CHANNELS" in os.environ else num_channels
 
     resolution_log2 = int(np.log2(resolution))
     assert resolution == 2**resolution_log2 and resolution >= 4
     def nf(stage): return np.clip(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_min, fmap_max)
-    assert architecture in ['orig', 'skip', 'resnet']
+    assert all([arch in ['orig', 'skip', 'resnet'] for arch in architecture])
     act = nonlinearity
     num_layers = resolution_log2 * 2 - 2
     images_out = None
@@ -478,7 +484,7 @@ def G_synthesis_stylegan2(
             x = layer(x, layer_idx=res*2-5, fmaps=nf(res-1), kernel=3, up=True)
         with tf.variable_scope('Conv1'):
             x = layer(x, layer_idx=res*2-4, fmaps=nf(res-1), kernel=3)
-        if architecture == 'resnet':
+        if 'resnet' in architecture:
             with tf.variable_scope('Skip'):
                 t = conv2d_layer(t, fmaps=nf(res-1), kernel=1, up=True, resample_kernel=resample_kernel)
                 x = (x + t) * (1 / np.sqrt(2))
@@ -499,7 +505,7 @@ def G_synthesis_stylegan2(
             x = tf.tile(tf.cast(x, dtype), [tf.shape(dlatents_in)[0], 1, 1, 1])
         with tf.variable_scope('Conv'):
             x = layer(x, layer_idx=0, fmaps=nf(1), kernel=3)
-        if architecture == 'skip':
+        if 'skip' in architecture:
             y = torgb(x, y, 2)
 
     # Main layers.
@@ -509,9 +515,9 @@ def G_synthesis_stylegan2(
             if 2**res == 64 and False:
                 print('Adding self-attention block to generator')
                 x = non_local_block(x, "SelfAtten", use_sn=True)
-            if architecture == 'skip':
+            if 'skip' in architecture:
                 y = upsample(y)
-            if architecture == 'skip' or res == resolution_log2:
+            if 'skip' in architecture or res == resolution_log2:
                 y = torgb(x, y, res)
     images_out = y
 
