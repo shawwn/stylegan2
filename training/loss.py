@@ -12,19 +12,21 @@ import dnnlib.tflib as tflib
 from dnnlib.tflib.autosummary import autosummary, autoimages
 from training import aug
 
+def image_augment(images):
+    return aug.tf_image_augment(images, data_format="NCHW")
+
 def G_get_output_for(G, latents, labels, **kwargs):
     out = G.get_output_for(latents, labels, **kwargs)
-    out = aug.tf_image_augment(out, data_format="NCHW")
+    out = image_augment(out)
     return out
 
 def G_get_output_for_dlatents(G, latents, labels, **kwargs):
     out, dlatents = G.get_output_for(latents, labels, **kwargs, return_dlatents=True)
-    out = aug.tf_image_augment(out, data_format="NCHW")
+    out = image_augment(out)
     return out, dlatents
 
-def D_get_output_for(D, latents, labels, **kwargs):
-    out = D.get_output_for(latents, labels, **kwargs)
-    out = aug.tf_image_augment(out, data_format="NCHW")
+def D_get_output_for(D, images, labels, **kwargs):
+    out = D.get_output_for(images, labels, **kwargs)
     return out
 
 #----------------------------------------------------------------------------
@@ -52,6 +54,7 @@ def G_logistic_ns(Gs, G, D, opt, training_set, minibatch_size):
     return loss, None
 
 def D_logistic(Gs, G, D, opt, training_set, minibatch_size, reals, labels):
+    reals = image_augment(reals)
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     fake_images_out = G_get_output_for(G, latents, labels, is_training=True)
@@ -73,6 +76,7 @@ def D_logistic(Gs, G, D, opt, training_set, minibatch_size, reals, labels):
 # "Which Training Methods for GANs do actually Converge?", Mescheder et al. 2018
 
 def D_logistic_r1(Gs, G, D, opt, training_set, minibatch_size, reals, labels, gamma=10.0):
+    reals = image_augment(reals)
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     fake_images_out = G_get_output_for(G, latents, labels, is_training=True)
@@ -96,6 +100,7 @@ def D_logistic_r1(Gs, G, D, opt, training_set, minibatch_size, reals, labels, ga
     return loss, reg
 
 def D_logistic_r2(Gs, G, D, opt, training_set, minibatch_size, reals, labels, gamma=10.0):
+    reals = image_augment(reals)
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     fake_images_out = G_get_output_for(G, latents, labels, is_training=True)
@@ -133,6 +138,7 @@ def G_wgan(Gs, G, D, opt, training_set, minibatch_size):
     return loss, None
 
 def D_wgan(Gs, G, D, opt, training_set, minibatch_size, reals, labels, wgan_epsilon=0.001):
+    reals = image_augment(reals)
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     fake_images_out = G_get_output_for(G, latents, labels, is_training=True)
@@ -157,6 +163,7 @@ def D_wgan(Gs, G, D, opt, training_set, minibatch_size, reals, labels, wgan_epsi
 # "Improved Training of Wasserstein GANs", Gulrajani et al. 2017
 
 def D_wgan_gp(Gs, G, D, opt, training_set, minibatch_size, reals, labels, wgan_lambda=10.0, wgan_epsilon=0.001, wgan_target=1.0):
+    reals = image_augment(reals)
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     fake_images_out = G_get_output_for(G, latents, labels, is_training=True)
