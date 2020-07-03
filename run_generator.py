@@ -37,7 +37,7 @@ def generate_images(network_pkl, seeds, truncation_psi, minibatch_size=8):
     for i in tqdm(range(len(seeds)//mb + 1)):
         zs = z[i*mb:min((i+1)*mb, len(seeds))]
         print("\n")
-        print('Generating image for seeds %d to %d (%d/%d) ...' % (seeds[0]+i*mb, min(seeds[0]+(i+1) * mb, len(seeds)), i, len(seeds)//mb + 1))
+        print('Generating image for seeds %d to %d (%d/%d) ...' % (seeds[0]+i*mb, min(seeds[0]+(i+1) * mb, seeds[0] + len(seeds)), i, len(seeds)//mb + 1))
         t0 = time.time()
         tflib.set_vars({var: rnd.randn(*var.shape.as_list()) for var in noise_vars}) # [height, width]
         images = Gs.run(zs, None, **Gs_kwargs) # [minibatch, height, width, channel]
