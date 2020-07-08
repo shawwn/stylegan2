@@ -70,7 +70,6 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
     print('D_beta2: %f' % D_opt.beta2)
     sched.minibatch_size_base = int(os.environ['BATCH_SIZE']) if 'BATCH_SIZE' in os.environ else num_gpus
     sched.minibatch_gpu_base = int(os.environ['BATCH_PER']) if 'BATCH_PER' in os.environ else 1
-    D_loss.gamma = 10
     metrics = [metric_defaults[x] for x in metrics]
     desc = 'stylegan2'
 
