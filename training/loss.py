@@ -65,8 +65,8 @@ def D_logistic(Gs, G, D, opt, training_set, minibatch_size, reals, labels):
     fake_images_out = G_get_output_for(G, latents, labels, is_training=True)
     real_scores_out = D_get_output_for(D, reals, labels, is_training=True)
     fake_scores_out = D_get_output_for(D, fake_images_out, labels, is_training=True)
-    real_scores_out = autosummary('D_logistic_00/real_scores', real_scores_out)
-    fake_scores_out = autosummary('D_logistic_01/fake_scores', fake_scores_out)
+    fake_scores_out = autosummary('D_logistic_00/fake_scores', fake_scores_out)
+    real_scores_out = autosummary('D_logistic_01/real_scores', real_scores_out)
     loss = autosummary('D_logistic_00/fake_loss', tf.nn.softplus(fake_scores_out)) # -log(1-sigmoid(fake_scores_out))
     loss += autosummary('D_logistic_01/real_loss', tf.nn.softplus(-real_scores_out)) # -log(sigmoid(real_scores_out)) # pylint: disable=invalid-unary-operand-type
     autosummary('D_logistic_02/total_loss', loss)
