@@ -58,7 +58,7 @@ def G_logistic_ns(Gs, G, D, opt, training_set, minibatch_size):
     autosummary('G_logistic_ns_00/total_loss', loss)
     return loss, None
 
-def D_logistic(Gs, G, D, opt, training_set, minibatch_size, reals, labels):
+def D_logistic(Gs, G, D, opt, training_set, minibatch_size, reals, labels, gamma=10.0):
     reals = image_augment(reals)
     _ = opt, training_set
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
@@ -69,6 +69,12 @@ def D_logistic(Gs, G, D, opt, training_set, minibatch_size, reals, labels):
     real_scores_out = autosummary('D_logistic_01/real_scores', real_scores_out)
     loss = autosummary('D_logistic_00/fake_loss', tf.nn.softplus(fake_scores_out)) # -log(1-sigmoid(fake_scores_out))
     loss += autosummary('D_logistic_01/real_loss', tf.nn.softplus(-real_scores_out)) # -log(sigmoid(real_scores_out)) # pylint: disable=invalid-unary-operand-type
+    with tf.name_scope('GradientPenalty'):
+        real_grads = tf.gradients(tf.reduce_sum(real_scores_out), [reals])[0]
+        gradient_penalty = tf.reduce_sum(tf.square(real_grads), axis=[1, 2, 3])
+        gradient_penalty = autosummary('D_logistic_02/gradient_penalty', gradient_penalty)
+        reg = gradient_penalty * (gamma * 0.5)
+        autosummary('D_logistic_02/reg_loss', reg)
     autosummary('D_logistic_02/total_loss', loss)
     autoimages('D_logistic/images/real', reals)
     autoimages('D_logistic/images/fake', fake_images_out)
