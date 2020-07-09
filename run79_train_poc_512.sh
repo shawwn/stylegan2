@@ -42,8 +42,8 @@ export IMAGENET_UNCONDITIONAL="${IMAGENET_UNCONDITIONAL:-1}"
 export ITERATIONS_PER_LOOP="${ITERATIONS_PER_LOOP:-256}"
 export HOST_CALL_EVERY_N_STEPS="${HOST_CALL_EVERY_N_STEPS:-64}"
 
-export G_LR_MULT="${G_LR_MULT:-0.25}"
-export D_LR_MULT="${D_LR_MULT:-0.25}"
+export G_LR_MULT="0.25"
+export D_LR_MULT="0.125"
 export TRAINING_LOSS_D=training.loss.D_logistic
 
 if [ ! -z "$DD_API_KEY" ]
